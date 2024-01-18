@@ -4,8 +4,10 @@
 
 int outputState = 0;
 int inputState = 0;
-unsigned long startMillis;
-unsigned long currentMillis;
+unsigned long startMillisDeMux;
+unsigned long currentMillisDeMux;
+unsigned long currentMillisMux;
+unsigned long startMillisMux;
 unsigned long period = 1000;
 
 bool address1[8] = {LOW, HIGH, LOW, HIGH, LOW, HIGH, LOW, HIGH};
@@ -22,23 +24,28 @@ void setup() {
     digitalWrite(ADDRESS1, LOW);
     digitalWrite(ADDRESS2, LOW);
     digitalWrite(ADDRESS3, LOW);
-    startMillis = millis();
+    startMillisDeMux = millis();
+    startMillisMux = millis();
 }
 
 void loop() {
-    currentMillis = millis();
-    if ((currentMillis - startMillis) >= period) {
-      startMillis = currentMillis;
-      digitalWrite(ADDRESS1, address1[outputState]);
-      digitalWrite(ADDRESS2, address2[outputState]);
-      digitalWrite(ADDRESS3, address3[outputState]);
-      outputState += 1;
-      if (outputState == 8) {
-        outputState = 0;
-      }
+  currentMillisDeMux = millis();
+  if ((currentMillisDeMux - startMillisDeMux) >= period*8) {
+    startMillisDeMux = currentMillisDeMux;
+    digitalWrite(ADDRESS1, address1[outputState]);
+    digitalWrite(ADDRESS2, address2[outputState]);
+    digitalWrite(ADDRESS3, address3[outputState]);
+    multiplexerFunction();
+    outputState += 1;
+    if (outputState == 8) {
+      outputState = 0;
     }
+  }
 }
 
 void multiplexerFunction() {
-  
+  currentMillisMux = millis();
+  if ((currentMillisMux - startMillisMux) >= period) {
+    
+  }
 }
