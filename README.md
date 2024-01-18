@@ -6,4 +6,4 @@ Force_Sensor_GUI.py - The main in-progress file for talking with the Arduino and
 
 [Demultiplexer Data Sheet](https://github.com/James-Wade1/pressure_sensor/blob/main/Demultiplexer%20Data%20Sheet.pdf) - ours is a CD74HCT238E. Note: A demultiplexer takes one input and directs it to multiple outputs
 
-- ours is a CD74HCT251E. Note: A multiplexer takes multiple inputs and directs one output
+[Multiplexer Data Sheet](https://github.com/James-Wade1/pressure_sensor/blob/main/Multiplexer%20Datasheet%20TI%20CD74HCT251E.pdf) - ours is a CD74HCT251E. Note: A multiplexer takes multiple inputs and directs one output
