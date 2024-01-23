@@ -1,3 +1,4 @@
+/*
 #define ADDRESS1 22
 #define ADDRESS2 24
 #define ADDRESS3 26
@@ -5,6 +6,11 @@
 #define MUX_S0 32
 #define MUX_S1 34
 #define MUX_S2 36
+*/
+
+#define ADDRESS1 22
+#define ADDRESS2 24
+#define ADDRESS3 26
 
 int outputState = 0;
 int inputState = 0;
@@ -25,15 +31,18 @@ void setup() {
     pinMode(ADDRESS1, OUTPUT);
     pinMode(ADDRESS2, OUTPUT);
     pinMode(ADDRESS3, OUTPUT);
-    pinMode(MUX_S0, OUTPUT);
-    pinMode(MUX_S1, OUTPUT);
-    pinMode(MUX_S2, OUTPUT);
+    //pinMode(MUX_S0, OUTPUT);
+    //pinMode(MUX_S1, OUTPUT);
+    //pinMode(MUX_S2, OUTPUT);
     digitalWrite(ADDRESS1, LOW);
     digitalWrite(ADDRESS2, LOW);
     digitalWrite(ADDRESS3, LOW);
-    digitalWrite(MUX_S0, HIGH);
-    digitalWrite(MUX_S1, LOW);
-    digitalWrite(MUX_S2, LOW);
+    //digitalWrite(MUX_S0, HIGH);
+    //digitalWrite(MUX_S1, LOW);
+    //digitalWrite(MUX_S2, LOW);
+
+    pinMode(40, OUTPUT);
+    digitalWrite(40, LOW);
 
     startMillisDeMux = millis();
     startMillisMux = millis();
