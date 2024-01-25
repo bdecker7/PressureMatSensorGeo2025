@@ -52,12 +52,12 @@ void setup() {
 
 void loop() {
   currentMillisDeMux = millis();
-  if ((currentMillisDeMux - startMillisDeMux) >= period) {
+  if ((currentMillisDeMux - startMillisDeMux) >= 8*period) {
     startMillisDeMux = currentMillisDeMux;
     digitalWrite(ADDRESS1, address1[outputState]);
     digitalWrite(ADDRESS2, address2[outputState]);
     digitalWrite(ADDRESS3, address3[outputState]);
-    //multiplexerFunction();
+    multiplexerFunction();
     outputState += 1;
     if (outputState == 8) {
       outputState = 0;
@@ -68,6 +68,8 @@ void loop() {
 void multiplexerFunction() {
   currentMillisMux = millis();
   if ((currentMillisMux - startMillisMux) >= period) {
-    
+    //digitalWrite(MUX_S0, HIGH);
+    //digitalWrite(MUX_S1, LOW);
+    //digitalWrite(MUX_S2, LOW);
   }
 }
