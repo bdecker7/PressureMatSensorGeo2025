@@ -2,7 +2,7 @@ import serial
 
 import time
 
-serialcomm = serial.Serial('COM3')
+serialcomm = serial.Serial('COM4')
 
 serialcomm.timeout = 1
 
