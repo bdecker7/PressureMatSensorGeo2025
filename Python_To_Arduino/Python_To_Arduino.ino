@@ -8,18 +8,13 @@ int myArray[NUM_MEASUREMENT_POINTS] = {1, 2, 3, 4, 5};
 // boolean first_loop = true;
 
 void printToSerialIfEmpty(String str) {
-  // int buffer_size = SERIAL_TX_BUFFER_SIZE;
-  // int available_for_writing = Serial.availableForWrite();
-  // Serial.print("Size of TX buffer: ");
-  // Serial.print((String)buffer_size);
-  // Serial.print(" Serial.availableForWrite(): ");
-  // Serial.println((String)available_for_writing);
   Serial.print(str);
+  Serial.flush();
 }
 
 String intArrayToString(int intArray[], size_t numElements) {
   /* Create a string representation of an int array.
-   * Has the form "[1,2,3,4,...]"
+   * Output string has the form "[1,2,3,4,...]"
   */
   String arrayString = "[";
   for (size_t i = 0; i < numElements; i++) {
