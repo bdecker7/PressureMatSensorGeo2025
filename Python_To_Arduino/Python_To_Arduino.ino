@@ -11,10 +11,10 @@ void setup() {
 
 void loop() {
   // put your main code here, to run repeatedly:
-  Serial.write("In loop");
+  //Serial.write("In loop");
   if (Serial.available() > 0) {
     String inBytes = Serial.readStringUntil('\n');
-    Serial.write("Reached if statement");
+    //Serial.write("Reached if statement");
     if (inBytes == "on") {
       digitalWrite(LED_BUILTIN, HIGH);
       Serial.write("LED on");
