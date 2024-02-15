@@ -36,10 +36,9 @@ while(1):
             serialcomm.write(0b1)
 
         var_decoded = string.decode('ascii')
-        print(var_decoded)
         
         data = data_processor.parseStringToInt(var_decoded)
-    
+        gui.update_heated_map(data)
 
 # Close serial communication
 serialcomm.close()
