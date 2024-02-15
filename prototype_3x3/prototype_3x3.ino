@@ -1,20 +1,92 @@
 /* This file contains the Arduino sketch that runs the pressure mat. 
 */
 
-#define MUX_S0 22
-#define MUX_S1 24
-#define MUX_S2 26
-#define DEMUX_A0 49
-#define DEMUX_A1 51
-#define DEMUX_A2 53
+#define DS0 2 //Demux select 0 pin
+#define DS1 3
+#define DS2 4
+#define DS3 5
+#define MS0 6 //Mux select pin 0
+#define MS1 7
+#define MS2 8
+#define MS3 9
 #define VOLTAGE_READ A0
 #define COL 3 // The dimension (e.g. 3x3 or 8x8 of the prototype)
 #define ROW COL
 #define MAX_DIMENSION 8 // The maximum dimension, or number of output pins on the DEMUX
 
-bool address0[8] = {LOW, HIGH, LOW, HIGH, LOW, HIGH, LOW, HIGH};
-bool address1[8] = {LOW, LOW, HIGH, HIGH, LOW, LOW, HIGH, HIGH};
-bool address2[8] = {LOW, LOW, LOW, LOW, HIGH, HIGH, HIGH, HIGH};
+bool s0_states[16] = {LOW, HIGH, LOW, HIGH, LOW, HIGH, LOW, HIGH, LOW, HIGH, LOW, HIGH, LOW, HIGH, LOW, HIGH};
+bool s1_states[16] = {LOW, LOW, HIGH, HIGH, LOW, LOW, HIGH, HIGH, LOW, LOW, HIGH, HIGH, LOW, LOW, HIGH, HIGH};
+bool s2_states[16] = {LOW, LOW, LOW, LOW, HIGH, HIGH, HIGH, HIGH, LOW, LOW, LOW, LOW, HIGH, HIGH, HIGH, HIGH};
+bool s3_states[16] = {LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH};
+
+//Function prototypes
+void muxSetup();
+void demuxSetup();
+void muxSelect(int i);
+void demuxSelect(int i);
+String intArrayToString(int intArray[], size_t numElements);
+int* collectData();
+
+//Setup
+void setup() {
+    Serial.begin(9600);
+
+    muxSetup();
+    demuxSetup();
+}
+
+//Main loop
+void loop() {
+
+  int* data = collectData();
+
+  Serial.println(intArrayToString(data, ROW*COL));
+
+  delay(1000);
+  /*
+  while (!(UCSR0A & _BV(UDRE0)) || !(UCSR0A & _BV(TXC0))) {
+    delay(1000);
+  }
+  */
+}
+
+/** User-defined Functions **/
+void demuxSetup() {
+  pinMode(DS0, OUTPUT);
+  pinMode(DS1, OUTPUT);
+  pinMode(DS2, OUTPUT);
+  pinMode(DS3, OUTPUT);
+  digitalWrite(DS0, LOW);
+  digitalWrite(DS1, LOW);
+  digitalWrite(DS2, LOW);
+  digitalWrite(DS3, LOW);
+}
+
+void muxSetup() {
+  pinMode(MS0, OUTPUT);
+  pinMode(MS1, OUTPUT);
+  pinMode(MS2, OUTPUT);
+  pinMode(MS3, OUTPUT);
+  pinMode(VOLTAGE_READ, INPUT);
+  digitalWrite(MS0, LOW);
+  digitalWrite(MS1, LOW);
+  digitalWrite(MS2, LOW);
+  digitalWrite(MS3, LOW);
+}
+
+void muxSelect(int i) {
+  digitalWrite(MS0, s0_states[i]);
+  digitalWrite(MS1, s1_states[i]);
+  digitalWrite(MS2, s2_states[i]);
+  digitalWrite(MS3, s3_states[i]);
+}
+
+void demuxSelect(int i) {
+  digitalWrite(DS0, s0_states[i]);
+  digitalWrite(DS1, s1_states[i]);
+  digitalWrite(DS2, s2_states[i]);
+  digitalWrite(DS3, s3_states[i]);
+}
 
 String intArrayToString(int intArray[], size_t numElements) {
   /* Create a string representation of an int array. For serial transmission.
@@ -39,54 +111,13 @@ int* collectData() {
     for (size_t i = 0; i < ROW; i++) {
         for (size_t j = 0; j < COL; j++) {
             // Set DEMUX
-            digitalWrite(DEMUX_A0, address0[i]);
-            digitalWrite(DEMUX_A1, address1[i]);
-            digitalWrite(DEMUX_A2, address2[i]);
+            demuxSelect(i);
             // Set MUX
-            digitalWrite(MUX_S0, address0[j]);
-            digitalWrite(MUX_S1, address1[j]);
-            digitalWrite(MUX_S2, address2[j]);
+            muxSelect(j);
             // Read voltage at chosen point
             delay(5);
-            data[8*i+j] = analogRead(VOLTAGE_READ);
+            data[COL*i+j] = analogRead(VOLTAGE_READ);
         }
     }
     return data;
-}
-
-void setup() {
-    Serial.begin(9600);
-
-    pinMode(MUX_S0, OUTPUT);
-    pinMode(MUX_S1, OUTPUT);
-    pinMode(MUX_S2, OUTPUT);
-    pinMode(DEMUX_A0, OUTPUT);
-    pinMode(DEMUX_A1, OUTPUT);
-    pinMode(DEMUX_A2, OUTPUT);
-    pinMode(VOLTAGE_READ, INPUT);
-
-    digitalWrite(MUX_S0, LOW);
-    digitalWrite(MUX_S1, LOW);
-    digitalWrite(MUX_S2, LOW);
-    digitalWrite(DEMUX_A0, LOW);
-    digitalWrite(DEMUX_A1, LOW);
-    digitalWrite(DEMUX_A2, LOW);
-}
-
-void loop() {
-
-    int* data = collectData();
-
-    Serial.print(intArrayToString(data, ROW*COL));
-    while (SERIAL_TX_BUFFER_SIZE - Serial.availableForWrite() - 1 != 0) {
-      // Wait for data to be read from output buffer before repeating
-      delay(1);
-    }
-    // Serial.flush(); // Wait for data to be read from buffer before repeating
-    
-    // ^^ neither of the above "wait" methods seemed to work
-
-    // Serial.print(data[0]);
-    // Serial.println("test");
-    // delay(1000);
 }

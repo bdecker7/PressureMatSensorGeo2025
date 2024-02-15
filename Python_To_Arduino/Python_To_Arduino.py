@@ -8,16 +8,16 @@ def stringToIntList(string: str) -> list[int]:
 
 
 # open serial port
-serialcomm = serial.Serial('COM3')
+serialcomm = serial.Serial('COM7')
 serialcomm.timeout = 1
 
 while True:
     # get input command
     command = input("Enter Input: ").strip()
 
-    if command == "Done":
+    if command == "done":
 
-        print('finished')
+        print('Finished')
 
         break
 
@@ -37,13 +37,16 @@ while True:
     
     if command == "read":
 
-        string = serialcomm.read_all()
-        # print(type(string))
-        print(string)
-        # var_decoded = string.decode('ascii')
-        # print(type(var_decoded))
-        # print(var_decoded)
-
+        while(1):
+            time.sleep(.05)
+            print("Reading")
+            string = serialcomm.read_all()
+            serialcomm.write(0b1)
+            # print(type(string))
+            # print(string)
+            var_decoded = string.decode('ascii')
+            # print(type(var_decoded))
+            print(var_decoded)
         # listV = stringToIntList(var_decoded)
         # print(type(listV))
         # print(listV)
