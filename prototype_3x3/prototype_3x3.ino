@@ -1,54 +1,79 @@
-/* This file contains the Arduino sketch that runs the pressure mat. 
-*/
-
 #define DS0 2 //Demux select 0 pin
 #define DS1 3
 #define DS2 4
 #define DS3 5
-#define MS0 6 //Mux select pin 0
+#define MS0 6
 #define MS1 7
 #define MS2 8
 #define MS3 9
 #define VOLTAGE_READ A0
-#define COL 3 // The dimension (e.g. 3x3 or 8x8 of the prototype)
-#define ROW COL
-#define MAX_DIMENSION 8 // The maximum dimension, or number of output pins on the DEMUX
+#define COL 3
+#define ROW 3
+/*
+#define MOS1 10
+#define MOS2 11
+#define MOS3 12
+*/
+//#define DEBUG
 
+//Mux and Demux route selectors
 bool s0_states[16] = {LOW, HIGH, LOW, HIGH, LOW, HIGH, LOW, HIGH, LOW, HIGH, LOW, HIGH, LOW, HIGH, LOW, HIGH};
 bool s1_states[16] = {LOW, LOW, HIGH, HIGH, LOW, LOW, HIGH, HIGH, LOW, LOW, HIGH, HIGH, LOW, LOW, HIGH, HIGH};
 bool s2_states[16] = {LOW, LOW, LOW, LOW, HIGH, HIGH, HIGH, HIGH, LOW, LOW, LOW, LOW, HIGH, HIGH, HIGH, HIGH};
 bool s3_states[16] = {LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH};
 
+//int mosfets[COL] = {MOS1, MOS2, MOS3};
+
+float bias[ROW][COL];
+
 //Function prototypes
 void muxSetup();
 void demuxSetup();
+void mosfetSetup();
 void muxSelect(int i);
 void demuxSelect(int i);
-String intArrayToString(int intArray[], size_t numElements);
-int* collectData();
+void mosfetSelect(int i);
+void closeMosfet(int i);
+void calculateBias();
+int removeBias(int row, int col);
+String getPadStates();
+void userOptions();
+
 
 //Setup
 void setup() {
     Serial.begin(9600);
-
-    muxSetup();
     demuxSetup();
+    muxSetup();
+    //mosfetSetup();
+    calculateBias();
 }
 
-//Main loop
+//Loop
 void loop() {
 
-  int* data = collectData();
-
-  Serial.println(intArrayToString(data, ROW*COL));
-
-  delay(1000);
-  /*
-  while (!(UCSR0A & _BV(UDRE0)) || !(UCSR0A & _BV(TXC0))) {
-    delay(1000);
+  while (Serial.available() > 0) {
+    userOptions();
   }
-  */
+
+  #ifdef DEBUG
+    int i = 0;
+    int j = 0;
+    demuxSelect(i);
+    muxSelect(j);
+    digitalWrite(MOS1, HIGH);
+
+    Serial.println(analogRead(VOLTAGE_READ) - bias[i][j]);
+  #endif
+
+  #ifndef DEBUG
+    Serial.println(getPadStates());
+    Serial.println();
+    //while(!Serial.available() || Serial.read() == 0b1);
+  #endif
 }
+
+
 
 /** User-defined Functions **/
 void demuxSetup() {
@@ -74,6 +99,17 @@ void muxSetup() {
   digitalWrite(MS3, LOW);
 }
 
+/*
+void mosfetSetup() {
+  pinMode(MOS1, OUTPUT);
+  pinMode(MOS2, OUTPUT);
+  pinMode(MOS3, OUTPUT);
+  digitalWrite(MOS1, LOW);
+  digitalWrite(MOS2, LOW);
+  digitalWrite(MOS3, LOW);
+}
+*/
+
 void muxSelect(int i) {
   digitalWrite(MS0, s0_states[i]);
   digitalWrite(MS1, s1_states[i]);
@@ -88,36 +124,77 @@ void demuxSelect(int i) {
   digitalWrite(DS3, s3_states[i]);
 }
 
-String intArrayToString(int intArray[], size_t numElements) {
-  /* Create a string representation of an int array. For serial transmission.
-   * Output string has the form "[1,2,3,4,...]"
-  */
-  String arrayString = "[";
-  for (size_t i = 0; i < numElements; i++) {
-    arrayString += (String)intArray[i];
-    if (i < numElements - 1) arrayString += ",";
-  }
-  arrayString += "]";
-  return arrayString;
+/*
+void mosfetSelect(int i) {
+  digitalWrite(mosfets[i], HIGH);
 }
 
-int* collectData() {
-    /* Loops through all possible MUX/DEMUX combinations, gathers data at each one
-     * Returns pointer to int array containing values read
-    */
-    int data[ROW * COL];
-    
-    // i = DEMUX, j = MUX
-    for (size_t i = 0; i < ROW; i++) {
-        for (size_t j = 0; j < COL; j++) {
-            // Set DEMUX
-            demuxSelect(i);
-            // Set MUX
-            muxSelect(j);
-            // Read voltage at chosen point
-            delay(5);
-            data[COL*i+j] = analogRead(VOLTAGE_READ);
-        }
+void closeMosfet(int i) {
+  digitalWrite(mosfets[i], LOW);
+}
+*/
+
+String getPadStates() {
+  String output = "";
+
+  for(int row = 0; row < ROW; row++) {
+    demuxSelect(row);
+    delay(.1);
+    for(int col = 0; col < COL; col++) {
+      muxSelect(col);
+      //mosfetSelect(col);
+      delay(5);
+
+      output += String(removeBias(row, col));
+      delay(1);
+      //closeMosfet(col);
+
+      if (col != 2) {
+        output += ",";
+      }
     }
-    return data;
+    output += "\n";
+  }
+
+  return output;
+}
+
+void calculateBias() {
+  for(int row = 0; row < ROW; row++) {
+    demuxSelect(row);
+    for(int col = 0; col < COL; col++) {
+      muxSelect(col);
+      //mosfetSelect(col);
+      delay(5);
+
+      bias[row][col] = analogRead(VOLTAGE_READ);
+      Serial.println(bias[row][col]);
+      delay(1);
+      //closeMosfet(col);
+    }
+  }
+}
+
+int removeBias(int row, int col) {
+  return analogRead(VOLTAGE_READ) - bias[row][col];
+}
+
+void userOptions() {
+  String inBytes = Serial.readStringUntil('\n');
+
+  if (inBytes == "reset") {
+    Serial.println("Recalculated bias");
+    calculateBias();
+  }
+  else if (inBytes == "pause") {
+    Serial.println("Paused");
+    bool resumed = false;
+    while(!resumed) {
+      if (Serial.readStringUntil('\n') == "resume") {
+        Serial.println("Resuming ...");
+        delay(2000);
+        resumed = true;
+      }
+    }
+  }
 }

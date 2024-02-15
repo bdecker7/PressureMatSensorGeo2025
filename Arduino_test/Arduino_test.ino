@@ -9,7 +9,11 @@
 #define VOLTAGE_READ A0
 #define COL 3
 #define ROW 3
-
+/*
+#define MOS1 10
+#define MOS2 11
+#define MOS3 12
+*/
 //#define DEBUG
 
 //Mux and Demux route selectors
@@ -18,13 +22,18 @@ bool s1_states[16] = {LOW, LOW, HIGH, HIGH, LOW, LOW, HIGH, HIGH, LOW, LOW, HIGH
 bool s2_states[16] = {LOW, LOW, LOW, LOW, HIGH, HIGH, HIGH, HIGH, LOW, LOW, LOW, LOW, HIGH, HIGH, HIGH, HIGH};
 bool s3_states[16] = {LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH};
 
+//int mosfets[COL] = {MOS1, MOS2, MOS3};
+
 float bias[ROW][COL];
 
 //Function prototypes
 void muxSetup();
 void demuxSetup();
+void mosfetSetup();
 void muxSelect(int i);
 void demuxSelect(int i);
+void mosfetSelect(int i);
+void closeMosfet(int i);
 void calculateBias();
 int removeBias(int row, int col);
 String getPadStates();
@@ -36,6 +45,7 @@ void setup() {
     Serial.begin(9600);
     demuxSetup();
     muxSetup();
+    //mosfetSetup();
     calculateBias();
 }
 
@@ -51,8 +61,9 @@ void loop() {
     int j = 0;
     demuxSelect(i);
     muxSelect(j);
+    digitalWrite(MOS1, HIGH);
 
-    Serial.println(analogRead(VOLTAGE_READ));
+    Serial.println(analogRead(VOLTAGE_READ) - bias[i][j]);
   #endif
 
   #ifndef DEBUG
@@ -88,6 +99,17 @@ void muxSetup() {
   digitalWrite(MS3, LOW);
 }
 
+/*
+void mosfetSetup() {
+  pinMode(MOS1, OUTPUT);
+  pinMode(MOS2, OUTPUT);
+  pinMode(MOS3, OUTPUT);
+  digitalWrite(MOS1, LOW);
+  digitalWrite(MOS2, LOW);
+  digitalWrite(MOS3, LOW);
+}
+*/
+
 void muxSelect(int i) {
   digitalWrite(MS0, s0_states[i]);
   digitalWrite(MS1, s1_states[i]);
@@ -102,6 +124,16 @@ void demuxSelect(int i) {
   digitalWrite(DS3, s3_states[i]);
 }
 
+/*
+void mosfetSelect(int i) {
+  digitalWrite(mosfets[i], HIGH);
+}
+
+void closeMosfet(int i) {
+  digitalWrite(mosfets[i], LOW);
+}
+*/
+
 String getPadStates() {
   String output = "";
 
@@ -110,9 +142,12 @@ String getPadStates() {
     delay(.1);
     for(int col = 0; col < COL; col++) {
       muxSelect(col);
+      //mosfetSelect(col);
       delay(5);
 
       output += String(removeBias(row, col));
+      delay(1);
+      //closeMosfet(col);
 
       if (col != 2) {
         output += ",";
@@ -129,9 +164,12 @@ void calculateBias() {
     demuxSelect(row);
     for(int col = 0; col < COL; col++) {
       muxSelect(col);
+      //mosfetSelect(col);
       delay(5);
 
       bias[row][col] = analogRead(VOLTAGE_READ);
+      delay(1);
+      //closeMosfet(col);
     }
   }
 }
