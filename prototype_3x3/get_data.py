@@ -42,7 +42,8 @@ class DataFromSerial:
         for port in ports:
             if "Arduino" in port.description:  # Modify this condition based on your device's description
                 return port.device
-        return None  # Device not found
+        port = input("No port found. Enter name of COM port (e.g. \"COM3\"):")
+        return port
     
 if __name__ == "__main__":
     print(DataFromSerial.find_serial_port()) # Test the find_serial_port method
