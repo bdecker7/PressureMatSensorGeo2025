@@ -10,7 +10,7 @@ class DataProcessor:
         pass
 
     def processData(self, data_string: str) -> np.ndarray:
-        return np.array(data_string)
+        return self.stringToIntArray(data_string)
 
     def stringToIntArray(self, data_string: str) -> np.ndarray:
         # rows = str.split('\n')
@@ -19,6 +19,6 @@ class DataProcessor:
         #put the following data into a 2D array
         data = []
         for row in rows:
-            data.append([int(num) for num in row.split(',') if num not in ['[',']']])
+            data.append([float(num) for num in row.split(',') if num not in ['[',']','\r','']])
         
         return np.array(data)

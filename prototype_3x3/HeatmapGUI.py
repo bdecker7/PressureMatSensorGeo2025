@@ -5,11 +5,13 @@ import numpy as np
 import time
 import threading
 
-from get_data import DataFromSerial
+from DataFromSerial import DataFromSerial
 
 class HeatmapGUI:
     def __init__(self, root: tk.Tk, data_getter: DataFromSerial):
         self.data_getter = data_getter
+        self.vmin = 0
+        self.vmax = 850
 
         # Initialize the main window
         self.root = root
@@ -24,10 +26,12 @@ class HeatmapGUI:
         self.canvas_widget = self.canvas.get_tk_widget()
         self.canvas_widget.pack(side=tk.TOP, fill=tk.BOTH, expand=1)
 
+        self.fig.colorbar(self.ax.imshow(np.zeros((3, 3)), cmap='jet', interpolation='nearest',vmin=self.vmin, vmax=self.vmax))
+
         # Generate initial heatmap
         self.generate_heatmap()
 
-        self.update_interval = 0.01  # Update interval in seconds
+        self.update_interval = 0.01/2  # Update interval in seconds
         self.paused = False
 
         # Create a separate thread for updating data
@@ -54,13 +58,13 @@ class HeatmapGUI:
             # Check if the update is not paused
             if not self.paused:
                 # Generate new random data for the heatmap
-                # new_data = np.random.rand(10, 10)
+                #new_data = np.random.rand(10, 10)
 
                 new_data = self.data_getter.get_data()
 
                 # Clear the previous plot and display the new heatmap
                 self.ax.clear()
-                self.ax.imshow(new_data, cmap='jet', interpolation='nearest')
+                self.ax.imshow(new_data, cmap='jet', interpolation='nearest',vmin=self.vmin, vmax=self.vmax)
                 self.canvas.draw()
             # Wait for the specified update interval
             time.sleep(self.update_interval)

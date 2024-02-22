@@ -1,8 +1,8 @@
 # Step 1: Upload the sketch in 'prototype_3x3.ino' to the Arduino
 # Step 2: Run this Python script to continuously read data from the serial port and display through GUI object
 
-import data_processor as data_processor
-import gui
+import prototype_3x3.DataProcessor as DataProcessor
+import prototype_3x3.HeatmapGUI as HeatmapGUI
 
 import serial
 import time
@@ -19,8 +19,8 @@ i = 0
 serialcomm = serial.Serial(PORT)
 serialcomm.timeout = 1
 
-data_processor = data_processor.DataProcessor(PORT)
-gui = gui.Gui()
+DataProcessor = DataProcessor.DataProcessor(PORT)
+HeatmapGUI = HeatmapGUI.Gui()
 
 while(1):
     if (serialcomm.in_waiting > 0):
@@ -37,8 +37,8 @@ while(1):
 
         var_decoded = string.decode('ascii')
         
-        data = data_processor.stringToIntArray(var_decoded)
-        gui.update_heated_map(data)
+        data = DataProcessor.stringToIntArray(var_decoded)
+        HeatmapGUI.update_heated_map(data)
 
 # Close serial communication
 serialcomm.close()
