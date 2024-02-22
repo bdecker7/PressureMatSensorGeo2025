@@ -11,6 +11,10 @@ class DataFromSerial:
         self.serial_port = self.find_serial_port()
         # Open serial communication
         self.serialcomm = serial.Serial(PORT)
+        time.sleep(.01)
+        if (self.serialcomm.isOpen() == False):
+            print("Serial port not open")
+            raise Exception("Serial port not open")
         self.serialcomm.timeout = 1
 
         self.data_processor = dp.DataProcessor()
@@ -42,5 +46,5 @@ class DataFromSerial:
     
 if __name__ == "__main__":
     print(DataFromSerial.find_serial_port()) # Test the find_serial_port method
-    
+
     
