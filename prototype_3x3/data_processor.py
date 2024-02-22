@@ -5,7 +5,6 @@ This class defines variables and methods to organize,
 import numpy as np
 
 class DataProcessor:
-    port: str = ""
 
     def __init__(self) -> None:
         pass

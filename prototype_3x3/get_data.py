@@ -1,9 +1,5 @@
-# Step 1: Upload the sketch in 'prototype_3x3.ino' to the Arduino
-# Step 2: Run this Python script to continuously read data from the serial port and display through GUI object
-
-import data_processor as data_processor
-
 import serial
+import serial.tools.list_ports
 import time
 
 import data_processor as dp
@@ -12,6 +8,7 @@ class DataFromSerial:
     def __init__(self, PORT: str) -> None:
         self.i = 0
 
+        self.serial_port = self.find_serial_port()
         # Open serial communication
         self.serialcomm = serial.Serial(PORT)
         self.serialcomm.timeout = 1
@@ -35,3 +32,15 @@ class DataFromSerial:
     
     def close_serial(self):
         self.serialcomm.close()
+
+    def find_serial_port():
+        ports = serial.tools.list_ports.comports()
+        for port in ports:
+            if "Arduino" in port.description:  # Modify this condition based on your device's description
+                return port.device
+        return None  # Device not found
+    
+if __name__ == "__main__":
+    print(DataFromSerial.find_serial_port()) # Test the find_serial_port method
+    
+    

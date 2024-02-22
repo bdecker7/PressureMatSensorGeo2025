@@ -15,7 +15,7 @@ ser = serial.Serial('COM3', 9600, timeout=None)
 
 # Create a function to update the heatmap
 def update_heatmap():
-    heatmap_data = np.zeros((10, 10))
+    heatmap_data = np.zeros((3, 3))
     line = ser.readline().decode('utf-8')
     sensor_value = float(line.strip())
     heatmap_data[5,5] = float(sensor_value)

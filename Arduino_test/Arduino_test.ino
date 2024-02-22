@@ -69,7 +69,7 @@ void loop() {
   #ifndef DEBUG
     Serial.println(getPadStates());
     Serial.println();
-    while(!Serial.available() || Serial.read() == 0b1);
+    //while(!Serial.available() || Serial.read() == 0b1);
   #endif
 }
 
