@@ -7,11 +7,15 @@ import numpy as np
 class DataProcessor:
     port: str = ""
 
-    def __init__(self, port: str) -> None:
-        self.port = port
+    def __init__(self) -> None:
+        pass
 
-    def parseStringToInt(self, string: str) -> np.array:
-        rows = str.split('\n')
+    def processData(self, data_string: str) -> np.ndarray:
+        return np.array(data_string)
+
+    def stringToIntArray(self, data_string: str) -> np.ndarray:
+        # rows = str.split('\n')
+        rows = data_string.split('\n')
 
         #put the following data into a 2D array
         data = []

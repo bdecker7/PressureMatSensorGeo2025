@@ -26,7 +26,7 @@ while(1):
     if (serialcomm.in_waiting > 0):
         time.sleep(.1)
         string = serialcomm.read_all()
-        serialcomm.write(0b1)
+        serialcomm.write(0b1) # Let the Arduino script know that 
         var_decoded = string.decode('ascii')
         
         while(i < 5): # skip the first 5 iterations to ignore bad data
@@ -37,7 +37,7 @@ while(1):
 
         var_decoded = string.decode('ascii')
         
-        data = data_processor.parseStringToInt(var_decoded)
+        data = data_processor.stringToIntArray(var_decoded)
         gui.update_heated_map(data)
 
 # Close serial communication
