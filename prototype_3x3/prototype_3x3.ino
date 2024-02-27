@@ -138,7 +138,8 @@ String getPadStates() {
   String output = "";
 
   for(int row = 0; row < ROW; row++) {
-    demuxSelect(row);
+    //demuxSelect(row);
+    demuxSelect(0);
     delay(.1);
     for(int col = 0; col < COL; col++) {
       muxSelect(col);

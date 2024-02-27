@@ -31,7 +31,8 @@ class HeatmapGUI:
         # Generate initial heatmap
         self.generate_heatmap()
 
-        self.update_interval = 0.01/2  # Update interval in seconds
+        #self.update_interval = 0.01/2  # Update interval in seconds
+        self.update_interval = 0.01  # Update interval in seconds
         self.paused = False
 
         # Create a separate thread for updating data
