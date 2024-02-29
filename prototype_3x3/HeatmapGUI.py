@@ -1,4 +1,5 @@
 import tkinter as tk
+from matplotlib import pyplot as plt
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import numpy as np
@@ -7,67 +8,72 @@ import threading
 
 from DataFromSerial import DataFromSerial
 
+UPDATE_INTERVAL = 0.01 / 2  # Update interval in seconds
+HEATMAP_SIZE = (3, 3)  # Size of the heatmap
+
 class HeatmapGUI:
-    def __init__(self, root: tk.Tk, data_getter: DataFromSerial):
-        self.data_getter = data_getter
-        self.vmin = 0
-        self.vmax = 850
+    """GUI for displaying a heatmap based on data from a serial port."""
 
-        # Initialize the main window
-        self.root = root
-        self.root.title("Heatmap GUI")
+    def __init__(self, root, data_getter=None, vmin=0, vmax=1024):
+        if data_getter is None:
+            self.debug_mode = True
+        else:
+            self.debug_mode = False
+            self.data_getter = data_getter
         
-        # Create a Matplotlib figure and a subplot
-        self.fig = Figure(figsize=(5, 4), dpi=100)
-        self.ax = self.fig.add_subplot(111)
-        
-        # Create a Tkinter canvas widget to embed Matplotlib plot
-        self.canvas = FigureCanvasTkAgg(self.fig, master=root)
-        self.canvas_widget = self.canvas.get_tk_widget()
-        self.canvas_widget.pack(side=tk.TOP, fill=tk.BOTH, expand=1)
+        # Set up the heatmap
+        self.root = root # Tkinter root
+        self.vmin = vmin # Minimum value for the heatmap
+        self.vmax = vmax # Maximum value for the heatmap
 
-        self.fig.colorbar(self.ax.imshow(np.zeros((3, 3)), cmap='jet', interpolation='nearest',vmin=self.vmin, vmax=self.vmax))
+        # Set up the GUI
+        self.fig, self.ax = plt.subplots()
+        self.setup_gui()
 
-        # Generate initial heatmap
-        self.generate_heatmap()
-
-        self.update_interval = 0.01/2  # Update interval in seconds
+        # Start the data update thread
         self.paused = False
-
-        # Create a separate thread for updating data
         self.data_thread = threading.Thread(target=self.update_data)
-        self.data_thread.daemon = True  # Mark the thread as a daemon
-        # (a daemon thread runs in the background and does not prevent the program from exiting)
+        self.data_thread.daemon = True
         self.data_thread.start()
 
-        # Create a button to pause/resume updates
-        self.pause_button = tk.Button(root, text="Pause", command=self.toggle_pause)
+        # Set up the click event
+        self.clicked_coords = None
+        self.clicked_value_label = tk.Label(self.root)
+        self.clicked_value_label.pack()
+        self.fig.canvas.mpl_connect('button_press_event', self.on_click)
+
+    def setup_gui(self):
+        """Set up the GUI components."""
+        self.canvas = FigureCanvasTkAgg(self.fig, master=self.root)
+        self.canvas_widget = self.canvas.get_tk_widget()
+        self.canvas_widget.pack(side=tk.TOP, fill=tk.BOTH, expand=1)
+        self.fig.colorbar(self.ax.imshow(np.zeros(HEATMAP_SIZE), cmap='jet', interpolation='nearest', vmin=self.vmin, vmax=self.vmax))
+        self.generate_initial_heatmap()
+        self.pause_button = tk.Button(self.root, text="Pause", command=self.toggle_pause)
         self.pause_button.pack()
 
-    def generate_heatmap(self):
-        # Generate sample data for the heatmap
-        data = np.zeros((3, 3))
-        # Clear the previous plot and display the new heatmap
+    def generate_initial_heatmap(self):
+        """Generate the initial heatmap."""
+        data = np.zeros(HEATMAP_SIZE)
         self.ax.clear()
         self.ax.imshow(data, cmap='jet', interpolation='nearest')
         self.canvas.draw()
 
     def update_data(self):
-        # Continuously update data while the program is running
+        """Continuously update the heatmap with new data."""
         while True:
-            # Check if the update is not paused
             if not self.paused:
-                # Generate new random data for the heatmap
-                #new_data = np.random.rand(10, 10)
-
-                new_data = self.data_getter.get_data()
-
-                # Clear the previous plot and display the new heatmap
+                if self.debug_mode:
+                    new_data = np.random.randint(self.vmin, self.vmax, size=HEATMAP_SIZE)
+                else:
+                    new_data = self.data_getter.get_data()
                 self.ax.clear()
-                self.ax.imshow(new_data, cmap='jet', interpolation='nearest',vmin=self.vmin, vmax=self.vmax)
+                self.ax.imshow(new_data, cmap='jet', interpolation='nearest', vmin=self.vmin, vmax=self.vmax)
                 self.canvas.draw()
-            # Wait for the specified update interval
-            time.sleep(self.update_interval)
+                if self.clicked_coords:
+                    clicked_value = new_data[self.clicked_coords]
+                    self.clicked_value_label.config(text=f"Value at {self.clicked_coords}: {clicked_value}")
+            time.sleep(UPDATE_INTERVAL)
 
     def toggle_pause(self):
         # Toggle the pause state of the updates
@@ -77,3 +83,12 @@ class HeatmapGUI:
             self.pause_button.config(text="Resume")
         else:
             self.pause_button.config(text="Pause")
+    
+    def on_click(self, event):
+        """Handle click events on the heatmap."""
+        self.clicked_coords = (int(round(event.ydata)), int(round(event.xdata)))
+
+if __name__ == "__main__":
+    root = tk.Tk() # create main Tkinter window
+    app = HeatmapGUI(root) # initialize heatmap in main window
+    root.mainloop() # Start the Tkinter event loop
