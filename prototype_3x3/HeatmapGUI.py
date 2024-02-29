@@ -11,7 +11,7 @@ class HeatmapGUI:
     def __init__(self, root: tk.Tk, data_getter: DataFromSerial):
         self.data_getter = data_getter
         self.vmin = 0
-        self.vmax = 850
+        self.vmax = 800
 
         # Initialize the main window
         self.root = root

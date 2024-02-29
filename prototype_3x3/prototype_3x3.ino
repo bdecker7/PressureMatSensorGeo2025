@@ -14,7 +14,7 @@
 #define MOS2 11
 #define MOS3 12
 */
-//#define DEBUG
+#define DEBUG
 
 //Mux and Demux route selectors
 bool s0_states[16] = {LOW, HIGH, LOW, HIGH, LOW, HIGH, LOW, HIGH, LOW, HIGH, LOW, HIGH, LOW, HIGH, LOW, HIGH};
@@ -58,10 +58,9 @@ void loop() {
 
   #ifdef DEBUG
     int i = 0;
-    int j = 0;
+    int j = 1;
     demuxSelect(i);
     muxSelect(j);
-    digitalWrite(MOS1, HIGH);
 
     Serial.println(analogRead(VOLTAGE_READ) - bias[i][j]);
   #endif
@@ -138,8 +137,8 @@ String getPadStates() {
   String output = "";
 
   for(int row = 0; row < ROW; row++) {
-    //demuxSelect(row);
-    demuxSelect(0);
+    demuxSelect(row);
+    //demuxSelect(0);
     delay(.1);
     for(int col = 0; col < COL; col++) {
       muxSelect(col);
