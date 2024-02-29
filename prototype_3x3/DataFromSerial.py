@@ -9,7 +9,7 @@ class DataFromSerial:
         self.i = 0
 
         #self.serial_port = self.find_serial_port()
-        self.serial_port = "COM7" # Change this to the port of your Arduino
+        self.serial_port = "COM8" # Change this to the port of your Arduino
         # Open serial communication
         self.serialcomm = serial.Serial(self.serial_port)
         time.sleep(.01)
@@ -38,7 +38,7 @@ class DataFromSerial:
         try:
             return self.data_processor.processData(dataString.rstrip('\n\r'))
         except Exception as e:
-            print("Error processing data: ", e)
+            print("Error processing data: ", e, "Data: ", dataString, "End of data")
             data = self.serialcomm.read_all()
             dataString = data.decode('ascii')
             self.serialcomm.write(b'\x01')
