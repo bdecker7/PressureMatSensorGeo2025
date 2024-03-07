@@ -14,7 +14,7 @@ HEATMAP_SIZE = (3, 3)  # Size of the heatmap
 class HeatmapGUI:
     """GUI for displaying a heatmap based on data from a serial port."""
 
-    def __init__(self, root, data_getter=None, vmin=0, vmax=1024):
+    def __init__(self, root, data_getter=None, vmin=0, vmax=850):
         if data_getter is None:
             self.debug_mode = True
         else:

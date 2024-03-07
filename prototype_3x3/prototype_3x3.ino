@@ -14,7 +14,7 @@
 #define MOS2 11
 #define MOS3 12
 */
-#define DEBUG
+//#define DEBUG
 
 //Mux and Demux route selectors
 bool s0_states[16] = {LOW, HIGH, LOW, HIGH, LOW, HIGH, LOW, HIGH, LOW, HIGH, LOW, HIGH, LOW, HIGH, LOW, HIGH};
@@ -138,16 +138,13 @@ String getPadStates() {
 
   for(int row = 0; row < ROW; row++) {
     demuxSelect(row);
-    //demuxSelect(0);
     delay(.1);
     for(int col = 0; col < COL; col++) {
       muxSelect(col);
-      //mosfetSelect(col);
       delay(5);
 
       output += String(removeBias(row, col));
       delay(1);
-      //closeMosfet(col);
 
       if (col != 2) {
         output += ",";
