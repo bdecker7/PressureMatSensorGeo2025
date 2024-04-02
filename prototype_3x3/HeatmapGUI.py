@@ -129,7 +129,7 @@ class HeatmapGUI:
         self.export_label.pack()
 
         # Create a record button and timer
-        self.record_button = tk.Button(self.record_frame, text="Record Data", command=self.export_data,
+        self.record_button = tk.Button(self.record_frame, text="Record Data", command=self.toggle_record,
                                        bg="dimgrey", fg="white")
         self.record_button.pack()  # Pack the record button
         self.record_time_display = tk.Label(self.record_frame, text="Time: 0:00", bg="dimgrey", fg="white")
