@@ -95,7 +95,7 @@ class HeatmapGUI:
         self.sidebar = tk.Frame(self.main_frame, bg="dimgrey", border=0, relief=tk.FLAT, width=200)
         self.sidebar.pack(side=tk.RIGHT)
 
-        # Create a pause button
+        # Create a pause button that dyanmically changes size based on the window size
         self.pause_button = tk.Button(self.sidebar, text="Pause", font=("Arial", 14, "bold"), command=self.toggle_pause,
                                       bg="dimgrey", fg="white")
         self.pause_button.pack(side=tk.TOP)  # Pack the pause button
