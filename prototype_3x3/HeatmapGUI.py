@@ -58,16 +58,16 @@ class HeatmapGUI:
         self.main_frame.pack(side=tk.TOP, fill=tk.BOTH, expand=1)
 
         self.build_gui_heatmap()
-
-        # Build the sidebar
         self.build_gui_sidebar()
 
-        # Handle window closing event
+        # Handle window closing event to properly terminate the program
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
 
         # Set up the window size
-        window_width = 1020
-        window_height = 720
+        screen_width = self.root.winfo_screenwidth()
+        screen_height = self.root.winfo_screenheight()
+        window_width = int(screen_width * 2 / 3)
+        window_height = int(screen_height * 2 / 3)
         self.root.geometry(f"{window_width}x{window_height}")
     
     def build_gui_heatmap(self):
@@ -84,11 +84,11 @@ class HeatmapGUI:
         self.canvas_widget.pack(side=tk.LEFT, fill=tk.BOTH, expand=1)  # Pack the Tkinter widget
 
         # Add a colorbar to the heatmap
-        colorbar = self.ax.imshow(np.zeros(HEATMAP_SIZE), cmap='jet', interpolation='nearest',
+        self.colorbar = self.ax.imshow(np.zeros(HEATMAP_SIZE), cmap='jet', interpolation='nearest',
                       vmin=self.vmin, vmax=self.vmax)
-        colorbar.colorbar = self.fig.colorbar(colorbar)
-        colorbar.colorbar.ax.tick_params(axis='y', colors='white')
-        colorbar.colorbar.ax.yaxis.set_tick_params(color='white')
+        self.colorbar.colorbar = self.fig.colorbar(self.colorbar)
+        self.colorbar.colorbar.ax.tick_params(axis='y', colors='white')
+        self.colorbar.colorbar.ax.yaxis.set_tick_params(color='white')
 
     def build_gui_sidebar(self):
         # Create a sidebar frame
@@ -107,12 +107,15 @@ class HeatmapGUI:
         self.fig.canvas.mpl_connect('button_press_event', self.on_heatmap_click)
 
         # Add space for displaying statistics
-        self.build_gui_stats_frame()
+        self.build_gui_frame_stats()
 
         # Create a frame for data recording, saving, and exporting (inside the sidebar)
-        self.build_gui_record_export_frame()
+        self.build_gui_frame_record_export()
 
-    def build_gui_stats_frame(self):
+        # Create a frame for holding a "zoom" slider (inside the sidebar)
+        self.build_gui_frame_zoom()
+
+    def build_gui_frame_stats(self):
         # Create a frame for related stats (inside the sidebar)
         self.stats_frame = tk.Frame(self.sidebar, bg="dimgrey", border=0, relief=tk.FLAT)
         self.stats_frame.pack(side=tk.TOP)
@@ -121,7 +124,7 @@ class HeatmapGUI:
         self.stats_text_box = tk.Text(self.stats_frame, height=5, width=10, bg="dimgrey", fg="white")
         self.stats_text_box.pack()
 
-    def build_gui_record_export_frame(self):
+    def build_gui_frame_record_export(self):
         self.record_frame = tk.Frame(self.sidebar, bg="dimgrey", border=0, relief=tk.FLAT)
         self.record_frame.pack(side=tk.TOP)
         self.export_label = tk.Label(self.record_frame, text="Save and Export:", font=("Arial", 14, "bold"),
@@ -129,7 +132,7 @@ class HeatmapGUI:
         self.export_label.pack()
 
         # Create a record button and timer
-        self.record_button = tk.Button(self.record_frame, text="Record Data", command=self.export_data,
+        self.record_button = tk.Button(self.record_frame, text="Record Data", command=self.toggle_record,
                                        bg="dimgrey", fg="white")
         self.record_button.pack()  # Pack the record button
         self.record_time_display = tk.Label(self.record_frame, text="Time: 0:00", bg="dimgrey", fg="white")
@@ -139,6 +142,38 @@ class HeatmapGUI:
         self.export_button = tk.Button(self.record_frame, text="Export Data", command=self.export_data,
                                        bg="dimgrey", fg="white")
         self.export_button.pack()  # Pack the export button
+    
+    def build_gui_frame_zoom(self):
+        # Create a frame for the zoom slider (inside the sidebar)
+        self.zoom_frame = tk.Frame(self.sidebar, bg="dimgrey", border=0, relief=tk.FLAT)
+        self.zoom_frame.pack(side=tk.TOP)
+        self.zoom_label = tk.Label(self.zoom_frame, text="Zoom:", font=("Arial", 14, "bold"), bg="dimgrey", fg="white")
+        self.zoom_label.pack()
+        self.zoom_slider = tk.Scale(self.zoom_frame, from_=0, to=10, orient=tk.HORIZONTAL, bg="dimgrey", fg="white")
+        self.zoom_slider.pack()
+
+        # Connect the zoom slider to a function that changes the zoom level
+        self.zoom_slider.bind("<ButtonRelease-1>", self.change_zoom)
+    
+    def change_zoom(self, event):
+        # Change the size of text in the sidebar based on the zoom level
+        self.zoom_level = self.zoom_slider.get()
+        self.font_size = 14 + self.zoom_level
+        self.data_label.config(font=("Arial", self.font_size, "bold"))
+        self.export_label.config(font=("Arial", self.font_size, "bold"))
+        self.zoom_label.config(font=("Arial", self.font_size, "bold"))
+        self.clicked_value_label.config(font=("Arial", self.font_size, "bold"))
+        self.record_button.config(font=("Arial", self.font_size, "bold"))
+        self.export_button.config(font=("Arial", self.font_size, "bold"))
+        self.pause_button.config(font=("Arial", self.font_size, "bold"))
+        self.record_time_display.config(font=("Arial", self.font_size, "bold"))
+        self.stats_text_box.config(font=("Arial", self.font_size, "bold"))
+
+        # Change the size of the text axis labels on the heatmap based on the zoom level
+        self.ax.tick_params(axis='x', labelsize=self.font_size - 2)
+        self.ax.tick_params(axis='y', labelsize=self.font_size - 2)
+        self.colorbar.colorbar.ax.yaxis.set_tick_params(labelsize=self.font_size - 2)
+        self.canvas.draw()
 
     def gui_update_loop(self):
         """Continuously update the GUI with new data."""
