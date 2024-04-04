@@ -7,14 +7,14 @@ import numpy as np
 class DataProcessor:
 
     def __init__(self) -> None:
-        self.R_C = 300 #resistance of the pull-down resistor
+        self.R_C = 220 #resistance of the pull-down resistor
         self.VOLTS = 5 #voltage of the power supply
         pass
 
     def processData(self, data_string: str) -> np.ndarray:
         rawVoltages: np.ndarray = self.stringToIntArray(data_string)/1024*5
         size = rawVoltages.shape[0]
-        overallVoltages = np.empty((size, size), dtype=object)
+        resistances = np.zeros((size,size))
 
         #calculate the resistance of the sensor for each row
         for k in range(size):
@@ -25,25 +25,15 @@ class DataProcessor:
                         voltages[i,j] = self.VOLTS - rawVoltages[k,i]
                     else:
                         voltages[i,j] = -rawVoltages[k,i]
-            overallVoltages[k,k] = voltages
+            
+            I = rawVoltages[k]/self.R_C
+            I = I.reshape(size,1)
+            R_flat = np.linalg.solve(voltages, I)
+            R_flat = 1/R_flat
+            resistances[k] = R_flat.reshape(1, size)
 
-        # Calculate currents using vectorized operations
-        I = rawVoltages / self.R_C
-
-        # Flatten the array to a column vector
-        I_flat = I.flatten().reshape(-1, 1)
-
-        # Solve the system of linear equations
-        R_flat = np.linalg.solve(overallVoltages, I_flat)
-
-        # Reshape the result back to a matrix
-        R_matrix = R_flat.reshape(size, size)
-
-        # Invert the elements of the resulting matrix to get resistance values
-        R_matrix = 1 / R_matrix
-
-        return R
-
+        return resistances
+    
     def stringToIntArray(self, data_string: str) -> np.ndarray:
         rows = data_string.split('\n')
 
@@ -56,5 +46,5 @@ class DataProcessor:
     
 if __name__ == "__main__":
     dataProcessor = DataProcessor() # create main Tkinter window
-    data = dataProcessor.processData("500,500,500\n500,500,500\n500,500,500")
+    data = dataProcessor.processData("600,400,200\n200,200,200\n200,200,200")
     print(data) # Test the processData method
