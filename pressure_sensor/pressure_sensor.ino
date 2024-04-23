@@ -1,14 +1,21 @@
+// ARDUINO CODE FOR PRESSURE MAT
+
 #define DS0 2 //Demux select 0 pin
 #define DS1 3
 #define DS2 4
 #define DS3 5
+
 #define MS0 6
 #define MS1 7
 #define MS2 8
 #define MS3 9
+
+#define DSA 10 // Demux A enable pin
+#define DSB 11 // Demux B enable pin
+
 #define VOLTAGE_READ A0
-#define COL 3
-#define ROW 3
+#define COL 16
+#define ROW 16
 /*
 #define MOS1 10
 #define MOS2 11
@@ -45,6 +52,7 @@ void setup() {
     Serial.begin(9600);
     demuxSetup();
     muxSetup();
+    digitalWrite(DS0, HIGH);
     //mosfetSetup();
     calculateBias();
 }
@@ -68,7 +76,7 @@ void loop() {
   #ifndef DEBUG
     Serial.println(getPadStates());
     Serial.println();
-    while(Serial.read() != 0b1);
+    //while(Serial.read() != 0b1);
   #endif
 }
 
@@ -120,7 +128,16 @@ void demuxSelect(int i) {
   digitalWrite(DS0, s0_states[i]);
   digitalWrite(DS1, s1_states[i]);
   digitalWrite(DS2, s2_states[i]);
-  digitalWrite(DS3, s3_states[i]);
+  if (i < 8) {
+    //enable demux B
+    //disable demux A
+  }
+  else {
+    //enable demux A
+    //disable demux B
+  }
+
+  // digitalWrite(DS3, s3_states[i]);
 }
 
 /*
@@ -152,7 +169,6 @@ String getPadStates() {
     }
     output += "\n";
   }
-
   return output;
 }
 
