@@ -15,7 +15,7 @@ HEATMAP_SIZE = (16, 16)  # Size of the heatmap
 class HeatmapGUI:
     """GUI for displaying a heatmap based on data from a serial port."""
 
-    def __init__(self, root, data_getter=None, vmin=0, vmax=850):
+    def __init__(self, root, data_getter: DataFromSerial = None, vmin=0, vmax=200):
         if data_getter is None:
             self.debug_mode = True
             vmin=-1
@@ -252,7 +252,7 @@ class HeatmapGUI:
         """Display the mean, standard deviation, min, and max of the heatmap data."""
         # Display the stats in the text box
         self.stats_text_box.delete(1.0, tk.END)
-        self.stats_text_box.insert(tk.END, f"Mean: {self.mean:.2f}\n")
+        self.stats_text_box.insert(tk.END, f"Ave: {self.mean:.2f}\n")
         self.stats_text_box.insert(tk.END, f"Std: {self.std:.2f}\n")
         self.stats_text_box.insert(tk.END, f"Min: {self.min_val:.2f}\n")
         self.stats_text_box.insert(tk.END, f"Max: {self.max_val:.2f}\n")
