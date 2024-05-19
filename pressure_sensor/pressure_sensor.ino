@@ -63,7 +63,7 @@ void userOptions();
 */
 
 void setup() {
-    Serial.begin(9600);
+    Serial.begin(115200);
     demuxSetup();
     muxSetup();
     //mosfetSetup();
@@ -74,11 +74,10 @@ void setup() {
 
 void loop() {
 
-  while (Serial.available() > 0) {
-    userOptions();
-  }
-
   #ifdef DEBUG
+    while (Serial.available() > 0) {
+      userOptions();
+    }
     int i = 0;
     int j = 1;
     demuxSelect(i);
@@ -173,16 +172,16 @@ void sendData() {
 void collectData() {
   for(int row = 0; row < ROW; row++) {
     demuxSelect(row); // Select the row on the demultiplexer
-    delay(.1);
+    delayMicroseconds(10);
     for(int col = 0; col < COL; col++) {
       muxSelect(col); // Select the column on the multiplexer
-      delay(5);
+      delayMicroseconds(10);
 
       int value = removeBias(row, col); // Read the voltage at the selected row and column
       value = value < 0 ? 0 : value; // If the value is negative, set it to 0
       DATA[row][col] = value; // Store the value in the data array
 
-      delay(1);
+      delayMicroseconds(10);
     }
   }
 }

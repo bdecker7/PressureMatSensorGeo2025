@@ -11,8 +11,7 @@ class DataProcessor:
         self.VOLTS = 5 #voltage of the power supply
         pass
 
-    def processData(self, data_string: str) -> np.ndarray:
-        rawVoltages: np.ndarray = self.stringToIntArray(data_string)/1024*5
+    def processData(self, rawVoltages: np.ndarray) -> np.ndarray:
         size = rawVoltages.shape[0]
         resistances = np.zeros((size,size))
 

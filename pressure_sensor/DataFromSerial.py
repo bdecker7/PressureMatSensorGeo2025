@@ -10,9 +10,9 @@ class DataFromSerial:
         self.i = 0
 
         #self.serial_port = self.find_serial_port()
-        self.serial_port = "COM5" # Change this to the port of your Arduino
+        self.serial_port = "COM7" # Change this to the port of your Arduino
         # Open serial communication
-        self.serialcomm = serial.Serial(self.serial_port)
+        self.serialcomm = serial.Serial(self.serial_port, baudrate=115200)
         time.sleep(.01)
         if (self.serialcomm.isOpen() == False):
             print("Serial port not open")
@@ -20,7 +20,6 @@ class DataFromSerial:
 
         # Wait for the Arduino to be ready before sending anything
         while self.serialcomm.read(1) != b'\x01': pass
-
         self.data_processor = dp.DataProcessor()
         
        
@@ -53,14 +52,14 @@ class DataFromSerial:
         return raw_data
         
         # FIXME: Process the raw data using the data processor:
-        try:
-            return self.data_processor.processData(dataString.rstrip('\n\r'))
-        except Exception as e:
+        raw_data = raw_data/1024*5
+        return self.data_processor.processData(raw_data)
+        '''except Exception as e:
             print("Error processing data: ", e, "Data: ", dataString, "End of data")
             data = self.serialcomm.read_all()
             dataString = data.decode('ascii')
             self.serialcomm.write(b'\x01')
-            return self.data_processor.processData(dataString.rstrip('\n\r'))
+            return self.data_processor.processData(dataString.rstrip('\n\r'))'''
     
 
     def close_serial(self):
@@ -82,6 +81,6 @@ if __name__ == "__main__":
     data_getter = DataFromSerial()
     while True:
         print(data_getter.get_data())
-        time.sleep(1)
+        time.sleep(.1)
 
     
