@@ -1,4 +1,6 @@
 import tkinter as tk
+from tkinter import messagebox
+from tkinter import filedialog
 from matplotlib import pyplot as plt
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
@@ -15,7 +17,7 @@ HEATMAP_SIZE = (16, 16)  # Size of the heatmap
 class HeatmapGUI:
     """GUI for displaying a heatmap based on data from a serial port."""
 
-    def __init__(self, root, data_getter: DataFromSerial = None, vmin=0, vmax=200):
+    def __init__(self, root, data_getter: DataFromSerial | None = None, vmin=0, vmax=500):
         if data_getter is None:
             self.debug_mode = True
             vmin=-1
@@ -149,7 +151,7 @@ class HeatmapGUI:
         self.zoom_frame.pack(side=tk.TOP)
         self.zoom_label = tk.Label(self.zoom_frame, text="Zoom:", font=("Arial", 14, "bold"), bg="dimgrey", fg="white")
         self.zoom_label.pack()
-        self.zoom_slider = tk.Scale(self.zoom_frame, from_=0, to=10, orient=tk.HORIZONTAL, bg="dimgrey", fg="white")
+        self.zoom_slider = tk.Scale(self.zoom_frame, from_=0, to=20, orient=tk.HORIZONTAL, bg="dimgrey", fg="white")
         self.zoom_slider.pack()
 
         # Connect the zoom slider to a function that changes the zoom level
@@ -157,7 +159,7 @@ class HeatmapGUI:
     
     def change_zoom(self, event):
         # Change the size of text in the sidebar based on the zoom level
-        self.zoom_level = self.zoom_slider.get()
+        self.zoom_level = int(self.zoom_slider.get())
         self.font_size = 14 + self.zoom_level
         self.data_label.config(font=("Arial", self.font_size, "bold"))
         self.export_label.config(font=("Arial", self.font_size, "bold"))
@@ -238,7 +240,7 @@ class HeatmapGUI:
         return data
     
     def on_close(self):
-        if tk.messagebox.askokcancel("Quit", "Do you want to quit?"):
+        if messagebox.askokcancel("Quit", "Do you want to quit?"):
             self.root.quit()
     
     def get_stats(self):
@@ -272,12 +274,12 @@ class HeatmapGUI:
         self.recorded_data = np.append(self.recorded_data, new_data, axis=0)
     
     def export_data(self):
-        folder_path = tk.filedialog.askdirectory()
+        folder_path = filedialog.askdirectory()
         # Save the recorded data to a CSV file with the current timestamp as name
         file_name = f"recorded_data_{time.strftime('%Y%m%d_%H%M%S')}.csv"
         file_path = os.path.join(folder_path, file_name)
         np.savetxt(file_path, self.recorded_data, delimiter=",")
-        tk.messagebox.showinfo("Export Successful", f"Data exported to {file_path}")
+        messagebox.showinfo("Export Successful", f"Data exported to {file_path}")
     
 if __name__ == "__main__":
     root = tk.Tk() # create main Tkinter window

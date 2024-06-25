@@ -6,15 +6,15 @@ import numpy as np
 import DataProcessor as dp
 
 class DataFromSerial:
-    def __init__(self) -> None:
+    def __init__(self):
         self.i = 0
 
         #self.serial_port = self.find_serial_port()
-        self.serial_port = "COM7" # Change this to the port of your Arduino
+        self.serial_port = "COM9" # Change this to the port of your Arduino
         # Open serial communication
         self.serialcomm = serial.Serial(self.serial_port, baudrate=115200)
         time.sleep(.01)
-        if (self.serialcomm.isOpen() == False):
+        if (self.serialcomm.is_open == False):
             print("Serial port not open")
             raise Exception("Serial port not open")
 
@@ -49,6 +49,7 @@ class DataFromSerial:
 
         # Get the raw data from the Arduino
         raw_data: np.ndarray = self.read_int_array()
+        # print(raw_data)
         return raw_data
         
         # FIXME: Process the raw data using the data processor:
