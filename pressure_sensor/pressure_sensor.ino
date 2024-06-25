@@ -22,7 +22,7 @@
 
 #define GET_DATA 0b1 //Byte defining the get data command
 
-//#define DEBUG
+// #define DEBUG
 
 
 /*
@@ -74,16 +74,25 @@ void setup() {
 
 void loop() {
 
-  #ifdef DEBUG
-    while (Serial.available() > 0) {
-      userOptions();
-    }
-    int i = 0;
-    int j = 1;
-    demuxSelect(i);
-    muxSelect(j);
+  // #ifdef DEBUG
+  //   while (Serial.available() > 0) {
+  //     userOptions();
+  //   }
+  //   int i = 0;
+  //   int j = 1;
+  //   demuxSelect(i);
+  //   muxSelect(j);
 
-    Serial.println(analogRead(VOLTAGE_READ) - bias[i][j]);
+  //   Serial.println(analogRead(VOLTAGE_READ) - bias[i][j]);
+  // #endif
+
+  #ifdef DEBUG
+    sendTwoByteInt(ROW);
+    sendTwoByteInt(COL);
+    collectData();
+    sendData();
+    
+    delay(500);
   #endif
 
   #ifndef DEBUG
@@ -161,13 +170,25 @@ void demuxSelect(int i) {
   digitalWrite(DS2, s2_states[i]);
 }
 
+
 void sendTwoByteInt(uint16_t value) {
   Serial.write((byte*)&value, sizeof(uint16_t));
 }
 
 void sendData() {
   Serial.write((byte*)DATA, ROW * COL * sizeof(uint16_t));
+
+  #ifdef DEBUG
+  for (int i = 0; i < ROW; i++) {
+    for (int j = 0; j < COL; j++) {
+      Serial.print(DATA[i][j]);
+      Serial.print(" ");
+    }
+    Serial.print("\n");
+  }
+  #endif
 }
+
 
 void collectData() {
   for(int row = 0; row < ROW; row++) {
