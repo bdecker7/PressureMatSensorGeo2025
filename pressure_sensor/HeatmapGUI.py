@@ -4,9 +4,8 @@ import tkinter.ttk as ttk # themed Tkinter
 from tkinter import Tk, messagebox
 from tkinter import filedialog
 from PIL import Image, ImageTk
-# from matplotlib import pyplot as plt
-# from matplotlib.figure import Figure
-# from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+from scipy.ndimage import zoom
+from matplotlib import cm # colormaps
 import numpy as np
 import time
 import threading
@@ -176,33 +175,37 @@ class HeatmapGUI:
 
             time.sleep(UPDATE_INTERVAL)
 
-    def draw_heatmap(self, canvas_resized: bool = False):
-        # Calculate the width and height (in pixels) of each cell in the heatmap
-        rows, cols = self.data.shape
-        cell_width_pixels = int(self.heatmap_canvas.winfo_width() / cols)
-        cell_height_pixels = int(self.heatmap_canvas.winfo_height() / rows)
-
-        if cell_width_pixels == 0 or cell_height_pixels == 0:
-            return # On the first iteration the canvas size is sometimes 0, so skip drawing in that case to avoid errors
-
-        # The heatmap starts out as a copy of the data
+    def draw_heatmap(self, canvas_resized: bool = False):      
+        # The heatmap image starts out as a copy of the data
         heatmap_image: np.ndarray = self.data.copy()
+
+        # Interpolate the data to smooth it out (make the heatmap image have smoother transitions)
+        zoom_factor = 4 # determines the degree of interpolation
+        heatmap_image = zoom(heatmap_image, zoom_factor, order=3, mode='nearest') # order=3 is cubic interpolation
+        # heatmap_image = np.clip(heatmap_image, self.vmin, self.vmax) # clip the values to the min and max (to avoid out-of-range values)
 
         # Convert the data into RGB colors based on its value
         heatmap_image = heatmap_image / (self.vmax - self.vmin) * 255 # Scale the data to 0-255
         heatmap_image = np.repeat(heatmap_image[:, :, np.newaxis], 3, axis=2) # Create 3 RGB channels
-        heatmap_image[:, :, 0] = np.where(heatmap_image[:, :, 0] <= 127, 0, heatmap_image[:, :, 0]) # red channel: 0's until 127, then linear ramp from 128 to 255
+        heatmap_image[:, :, 0] = np.where(heatmap_image[:, :, 0] <= 127, 0, 2*heatmap_image[:, :, 0] - 255) # red channel: 0's until 127, then linear ramp from 0 to 255
         heatmap_image[:, :, 1] = np.zeros_like(heatmap_image[:, :, 1]) # set the green channel to 0
         heatmap_image[:, :, 2] = 255 - 2*np.abs(heatmap_image[:, :, 2] - 127) # blue channel: a triangle function where 0 -> 0 | 127 -> 255 | 255 -> 0
 
         # heatmap_image[0, 0] = [255, 0, 0] # highlight the top-left corner for debugging
         
-        heatmap_image = heatmap_image.astype(np.uint8)
+        # Calculate the width and height (in pixels) of each cell in the heatmap
+        rows, cols = heatmap_image.shape[:2]
+        cell_width_pixels = int(self.heatmap_canvas.winfo_width() / cols)
+        cell_height_pixels = int(self.heatmap_canvas.winfo_height() / rows)
 
+        if cell_width_pixels == 0 or cell_height_pixels == 0:
+            return # On the first iteration the canvas size is sometimes 0, so skip drawing in that case to avoid errors
+        
         # Scale the data to the size of the heatmap canvas in pixels by repeating the values
         heatmap_image = np.repeat(heatmap_image, cell_width_pixels, axis=1)
         heatmap_image = np.repeat(heatmap_image, cell_height_pixels, axis=0)
         heatmap_image = np.ascontiguousarray(heatmap_image) # make it a C-contiguous array for faster drawing
+        heatmap_image = heatmap_image.astype(np.uint8)
 
         # Convert the numpy array to a Tkinter PhotoImage
         pil_image = Image.fromarray(heatmap_image)
