@@ -1,17 +1,23 @@
-from email.errors import HeaderMissingRequiredValue
 import tkinter as tk
 import tkinter.ttk as ttk # themed Tkinter
 from tkinter import Tk, messagebox
 from tkinter import filedialog
 from PIL import Image, ImageTk
 from scipy.ndimage import zoom
-from matplotlib import cm # colormaps
+from matplotlib import _cm as cm
+from matplotlib import colormaps as cmaps
 import numpy as np
 import time
 import threading
 import os
 
 from DataFromSerial import DataFromSerial
+
+# TODO:
+# - Add a legend/colorbar to the heatmap
+# - Make the level of smoothing (currently zoom level) adjustable from the GUI
+# - Make it so that COM port can be selected and applied from a dropdown in the GUI'
+# - Add more pixels to some of the cells in the heatmap to make it actually fill the canvas
 
 # UPDATE_INTERVAL = 0.01 / 2  # Update interval in seconds
 UPDATE_INTERVAL = 0
@@ -20,7 +26,7 @@ HEATMAP_SIZE = (16, 16)  # Size of the heatmap
 class HeatmapGUI:
     """GUI for displaying a heatmap based on data from a serial port."""
 
-    def __init__(self, root: Tk, data_getter: DataFromSerial | None = None, vmin=0, vmax=1023):
+    def __init__(self, root: Tk, data_getter: DataFromSerial | None = None, vmin=0, vmax=900):
         if data_getter is None:
             self.debug_mode = True
             # vmin=0
@@ -179,19 +185,16 @@ class HeatmapGUI:
         # The heatmap image starts out as a copy of the data
         heatmap_image: np.ndarray = self.data.copy()
 
-        # Interpolate the data to smooth it out (make the heatmap image have smoother transitions)
-        zoom_factor = 4 # determines the degree of interpolation
+        # Interpolate the data (make the heatmap image have smoother transitions between cells)
+        zoom_factor = 4 # determines the degree of interpolation/zooming
         heatmap_image = zoom(heatmap_image, zoom_factor, order=3, mode='nearest') # order=3 is cubic interpolation
-        # heatmap_image = np.clip(heatmap_image, self.vmin, self.vmax) # clip the values to the min and max (to avoid out-of-range values)
+        heatmap_image = np.clip(heatmap_image, self.vmin, self.vmax) # clip the values to the min and max (to avoid out-of-range values)
 
-        # Convert the data into RGB colors based on its value
-        heatmap_image = heatmap_image / (self.vmax - self.vmin) * 255 # Scale the data to 0-255
-        heatmap_image = np.repeat(heatmap_image[:, :, np.newaxis], 3, axis=2) # Create 3 RGB channels
-        heatmap_image[:, :, 0] = np.where(heatmap_image[:, :, 0] <= 127, 0, 2*heatmap_image[:, :, 0] - 255) # red channel: 0's until 127, then linear ramp from 0 to 255
-        heatmap_image[:, :, 1] = np.zeros_like(heatmap_image[:, :, 1]) # set the green channel to 0
-        heatmap_image[:, :, 2] = 255 - 2*np.abs(heatmap_image[:, :, 2] - 127) # blue channel: a triangle function where 0 -> 0 | 127 -> 255 | 255 -> 0
-
-        # heatmap_image[0, 0] = [255, 0, 0] # highlight the top-left corner for debugging
+        # Create and apply a colormap to the data
+        normalized_data = (heatmap_image - self.vmin) / (self.vmax - self.vmin) # normalize the data to 0-1 (for the matplotlib colormap)
+        colormap = cmaps.get_cmap('inferno') # choose a colormap (e.g., 'viridis', 'plasma', 'inferno', 'magma', 'cividis')
+        heatmap_image = colormap(normalized_data)[:, :, :3] # apply the colormap, remove the alpha (transparency) channel (just use RGB channels)
+        heatmap_image *= 255 # convert the data to 0-255 range       
         
         # Calculate the width and height (in pixels) of each cell in the heatmap
         rows, cols = heatmap_image.shape[:2]
