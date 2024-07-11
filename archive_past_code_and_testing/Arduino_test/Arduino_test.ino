@@ -24,7 +24,7 @@ bool s3_states[16] = {LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, HIGH, HIGH, HIGH, 
 
 //int mosfets[COL] = {MOS1, MOS2, MOS3};
 
-float bias[ROW][COL];
+float BIAS[ROW][COL];
 
 //Function prototypes
 void muxSetup();
@@ -63,7 +63,7 @@ void loop() {
     muxSelect(j);
     digitalWrite(MOS1, HIGH);
 
-    Serial.println(analogRead(VOLTAGE_READ) - bias[i][j]);
+    Serial.println(analogRead(VOLTAGE_READ) - BIAS[i][j]);
   #endif
 
   #ifndef DEBUG
@@ -167,7 +167,7 @@ void calculateBias() {
       //mosfetSelect(col);
       delay(5);
 
-      bias[row][col] = analogRead(VOLTAGE_READ);
+      BIAS[row][col] = analogRead(VOLTAGE_READ);
       delay(1);
       //closeMosfet(col);
     }
@@ -175,7 +175,7 @@ void calculateBias() {
 }
 
 int removeBias(int row, int col) {
-  return analogRead(VOLTAGE_READ) - bias[row][col];
+  return analogRead(VOLTAGE_READ) - BIAS[row][col];
 }
 
 void userOptions() {

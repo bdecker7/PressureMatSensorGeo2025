@@ -1,28 +1,34 @@
+// Uncomment the line below before uploading sketch to enable debugging mode
+// Data will be sent to the serial monitor instead of the python script
+
+#define DEBUG
 
 /*
  * Definitions:
 */
+
+// Pin definitions (must match the hardware connections)
+
 #define DS0 2 //Demux select 0 pin
 #define DS1 3 //Demux select 1 pin
 #define DS2 4 //Demux select 2 pin
-#define DS3 5 //Demux select 3 pin
 
-#define D1E 10 //Demux 1: enable pin
-#define D2E 11 //Demux 2: enable pin
+#define D1E 5 //Demux 1: enable pin
+#define D2E 6 //Demux 2: enable pin
 
-#define MS0 6 //Mux select 0 pin
-#define MS1 7 //Mux select 1 pin
-#define MS2 8 //Mux select 2 pin
-#define MS3 9 //Mux select 3 pin
+#define MS0 7 //Mux select 0 pin
+#define MS1 8 //Mux select 1 pin
+#define MS2 9 //Mux select 2 pin
+#define MS3 10 //Mux select 3 pin
 
 #define VOLTAGE_READ A0 //Voltage analog reading pin
+
+// Data definitions
 
 #define COL 16 //Number of columns in the sensor matrix
 #define ROW 16 //Number of rows in the sensor matrix
 
-#define GET_DATA 0b1 //Byte defining the get data command
-
-// #define DEBUG
+#define GET_DATA 0b1 //Byte defining the get data command received from the computer
 
 
 /*
@@ -35,9 +41,7 @@ bool s1_states[16] = {LOW, LOW, HIGH, HIGH, LOW, LOW, HIGH, HIGH, LOW, LOW, HIGH
 bool s2_states[16] = {LOW, LOW, LOW, LOW, HIGH, HIGH, HIGH, HIGH, LOW, LOW, LOW, LOW, HIGH, HIGH, HIGH, HIGH};
 bool s3_states[16] = {LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH};
 
-float bias[ROW][COL]; //Bias values for each sensor in the matrix
 bool D1On = false; //Demux 1 enable state
-static uint16_t DATA[ROW][COL]; //Data array to store the sensor readings
 
 
 /*
@@ -54,8 +58,7 @@ void demuxSelect(int i);
 void calculateBias();
 int removeBias(int row, int col);
 
-void collectData();
-void userOptions();
+void collectAndSendData(bool debug = false);
 
 
 /*
@@ -64,46 +67,32 @@ void userOptions();
 
 void setup() {
     Serial.begin(115200);
+    
     demuxSetup();
     muxSetup();
-    //mosfetSetup();
-    calculateBias();
 
-    Serial.write(0b1); // Send "ready" message to computer (a "1" byte)
+    #ifndef DEBUG
+      Serial.write(0b1); // Send "ready" message to computer (a "1" byte)
+    #endif
 }
 
 void loop() {
 
-  // #ifdef DEBUG
-  //   while (Serial.available() > 0) {
-  //     userOptions();
-  //   }
-  //   int i = 0;
-  //   int j = 1;
-  //   demuxSelect(i);
-  //   muxSelect(j);
+    #ifndef DEBUG
+      //Wait until data is requested by the computer
+      while(Serial.read() != GET_DATA);
+      
+      // Send the size of the data array
+      sendTwoByteInt(ROW);
+      sendTwoByteInt(COL);
+      collectAndSendData();
+    #endif
 
-  //   Serial.println(analogRead(VOLTAGE_READ) - bias[i][j]);
-  // #endif
 
-  #ifdef DEBUG
-    sendTwoByteInt(ROW);
-    sendTwoByteInt(COL);
-    collectData();
-    sendData();
-    
-    delay(500);
-  #endif
-
-  #ifndef DEBUG
-    while(Serial.read() != GET_DATA); //Wait until data is requested (by receiving a '1' byte)
-
-    // Send the size of the data, then the data itself
-    sendTwoByteInt(ROW);
-    sendTwoByteInt(COL);
-    collectData();
-    sendData();
-  #endif
+    #ifdef DEBUG
+      collectAndSendData(true);
+      delay(500); // Wait for a bit before sending the next data
+    #endif
 }
 
 
@@ -137,7 +126,6 @@ void muxSetup() {
   digitalWrite(MS3, LOW);
 }
 
-
 void muxSelect(int i) {
   digitalWrite(MS0, s0_states[i]);
   digitalWrite(MS1, s1_states[i]);
@@ -145,14 +133,12 @@ void muxSelect(int i) {
   digitalWrite(MS3, s3_states[i]);
 }
 
-
 void demuxSelect(int i) {
   if (i >= 8) {
     if (D1On == true) {
       digitalWrite(D1E, LOW);
       digitalWrite(D2E, HIGH);
       D1On = false;
-      // delay(50);
     }
   }
   else {
@@ -160,86 +146,39 @@ void demuxSelect(int i) {
       digitalWrite(D1E, HIGH);
       digitalWrite(D2E, LOW);
       D1On = true;
-      // delay(50);
     }
   }
-  // delay(3);
   i = i % 8;
   digitalWrite(DS0, s0_states[i]);
   digitalWrite(DS1, s1_states[i]);
   digitalWrite(DS2, s2_states[i]);
 }
 
-
 void sendTwoByteInt(uint16_t value) {
   Serial.write((byte*)&value, sizeof(uint16_t));
 }
 
-void sendData() {
-  Serial.write((byte*)DATA, ROW * COL * sizeof(uint16_t));
-
-  #ifdef DEBUG
-  for (int i = 0; i < ROW; i++) {
-    for (int j = 0; j < COL; j++) {
-      Serial.print(DATA[i][j]);
-      Serial.print(" ");
-    }
-    Serial.print("\n");
-  }
-  #endif
-}
-
-
-void collectData() {
+void collectAndSendData(bool debug = false) {
   for(int row = 0; row < ROW; row++) {
+    
     demuxSelect(row); // Select the row on the demultiplexer
-    delayMicroseconds(10);
+    delayMicroseconds(100);
+    
     for(int col = 0; col < COL; col++) {
+
       muxSelect(col); // Select the column on the multiplexer
-      delayMicroseconds(10);
+      delayMicroseconds(100);
 
-      int value = removeBias(row, col); // Read the voltage at the selected row and column
-      value = value < 0 ? 0 : value; // If the value is negative, set it to 0
-      DATA[row][col] = value; // Store the value in the data array
+      int value = analogRead(VOLTAGE_READ); // Read the voltage at the selected row and column
 
-      delayMicroseconds(10);
-    }
-  }
-}
-
-void calculateBias() {
-  for(int row = 0; row < ROW; row++) {
-    demuxSelect(row);
-    for(int col = 0; col < COL; col++) {
-      muxSelect(col);
-      delay(5);
-
-      bias[row][col] = analogRead(VOLTAGE_READ);
-      delay(1);
-    }
-  }
-}
-
-int removeBias(int row, int col) {
-  return analogRead(VOLTAGE_READ) - bias[row][col];
-}
-
-void userOptions() {
-  String inBytes = Serial.readStringUntil('\n');
-
-  if (inBytes == "reset") {
-    Serial.println("Recalculated bias");
-    calculateBias();
-  }
-  else if (inBytes == "pause") {
-    Serial.println("Paused");
-    bool resumed = false;
-    while(!resumed) {
-      if (Serial.readStringUntil('\n') == "resume") {
-        Serial.println("Resuming ...");
-        delay(2000);
-        resumed = true;
+      if (debug) {
+        Serial.print(value);
+        Serial.print("  ");
+      } else {
+        sendTwoByteInt(static_cast<uint16_t>(value)); // Send the value to the computer
       }
     }
+    if (debug) Serial.println();
   }
+  if (debug) Serial.println();
 }
