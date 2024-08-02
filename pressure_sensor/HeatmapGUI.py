@@ -4,7 +4,6 @@ from tkinter import Tk, messagebox
 from tkinter import filedialog
 from PIL import Image, ImageTk
 from scipy.ndimage import zoom
-from matplotlib import _cm as cm
 from matplotlib import colormaps as cmaps
 import numpy as np
 import time
@@ -14,10 +13,15 @@ import os
 from DataFromSerial import DataFromSerial
 
 # TODO:
+# - Refactor the whole thing! This can be organized much better, and use grid layout instead of pack
 # - Add a legend/colorbar to the heatmap
 # - Make the level of smoothing (currently zoom level) adjustable from the GUI
-# - Make it so that COM port can be selected and applied from a dropdown in the GUI'
+# - Make it so that COM port can be selected and applied from a dropdown in the GUI
 # - Add more pixels to some of the cells in the heatmap to make it actually fill the canvas
+# - Enforce square aspect ratio for the heatmap
+# - Reimplement being able to click on a cell in the heatmap to get the value
+# - Add a checkbox to be able to display the raw data on top of or instead of the heatmap
+# - Add a way to replay the data from a CSV file
 
 # UPDATE_INTERVAL = 0.01 / 2  # Update interval in seconds
 UPDATE_INTERVAL = 0
@@ -40,21 +44,22 @@ class HeatmapGUI:
         self.vmin = vmin # Minimum value for the heatmap
         self.vmax = vmax # Maximum value for the heatmap
 
-        # Set up the GUI
-        self.setup_gui()
-        self.heatmap_canvas.bind("<Configure>", self.on_resize)
-
         # Choose GUI visual style
         # call ttk.Style().theme_names() to get a list of available themes
         s = ttk.Style()
         s.theme_use('vista')
 
         # Initialize variables
+        self.data: np.ndarray = np.zeros(HEATMAP_SIZE)  # Data for the heatmap
         self.paused = False
         self.record_mode = False
         self.recorded_data = np.zeros((0, 4))
         self.record_start_time = 0
         self.folder_path = None
+
+        # Set up the GUI
+        self.setup_gui()
+        self.heatmap_canvas.bind("<Configure>", self.on_resize)
 
         # Start the data update thread
         self.data_thread = threading.Thread(target=self.gui_update_loop)
@@ -160,13 +165,9 @@ class HeatmapGUI:
             if not self.paused:
                 # Get updated data
                 if self.debug_mode:
-                    data = self.get_simulated_data()
+                    self.data = self.get_simulated_data()
                 else:
-                    data = self.data_getter.get_data()
-                
-                # Save the data, ensuring that no other thread (including the main thread) is accessing it during the update
-                with self.threading_lock: 
-                    self.data = data
+                    self.data = self.data_getter.get_data()
 
                 # get stats and record if applicable
                 self.get_stats()
