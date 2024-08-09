@@ -2,6 +2,9 @@ import serial.tools.list_ports as list_ports
 
 from appdirs import user_data_dir
 import numpy as np
+from scipy import ndimage
+from matplotlib import colormaps as cmaps
+from PIL import Image, ImageTk
 
 import sys
 import os
@@ -16,11 +19,18 @@ import threading
 import time
 
 
-HEATMAP_SIZE = (10, 10) # Size of the heatmap (rows, columns)
+# Constants
+MIN_VAL = 0
+MAX_VAL = 1023
+ASPECT_RATIO = 1.0 # Width/Height of the heatmap cells
 
 
+# The state of the GUI, in terms of user selections and settings
+# This dataclass is regularly saved to a JSON file and loaded 
+# when the GUI is started so that the user's previous settings are preserved
 @dataclass
 class PressureSensorGUIState:
+    heatmap_canvas_size: tuple[int, int] = (400, 400) # (width, height) in pixels
     data_source: Literal["com_port", "recorded", "simulated"] | None = None
     com_port: str | None = None
     frames_per_second: int | Literal["Max"] = "Max"
@@ -39,7 +49,7 @@ DEFAULT_STATE = PressureSensorGUIState()
 SAVE_DIR = user_data_dir("PressureSensorApp", "BYU_GEO_GlobalEngineeringOutreach")
 if not os.path.exists(SAVE_DIR):
     os.makedirs(SAVE_DIR)
-STATE_FILE = os.path.join(SAVE_DIR, "gui_state.json")
+STATE_FILE_PATH = os.path.join(SAVE_DIR, "gui_state.json")
 
 
 # Location of the GUI Icon
@@ -76,17 +86,17 @@ class PressureSensorGUI(tk.Tk):
         sys.exit(0)
 
     def save_state(self):
-        with open(STATE_FILE, "w") as file:
+        with open(STATE_FILE_PATH, "w") as file:
             json.dump(asdict(self.state), file, indent=4)
 
     def initialize_variables(self):
         # Create the GUI state JSON file if it doesn't exist
-        if not os.path.exists(STATE_FILE):
-            with open(STATE_FILE, "w") as file:
+        if not os.path.exists(STATE_FILE_PATH):
+            with open(STATE_FILE_PATH, "w") as file:
                 json.dump(asdict(DEFAULT_STATE), file, indent=4)
         
         # Load in the GUI state from the JSON file
-        with open(STATE_FILE, "r") as file:
+        with open(STATE_FILE_PATH, "r") as file:
             state = json.load(file)
             self.state = PressureSensorGUIState(**state)
             self.new_state = PressureSensorGUIState(**state)
@@ -131,9 +141,11 @@ class PressureSensorGUI(tk.Tk):
     def build_gui(self):
         self.configure(padx=self.padding, pady=self.padding)
 
-        frm_heatmap = ttk.Frame(self)
-        frm_heatmap.grid(row=0, column=0, sticky="nsew")
-        self.build_frm_heatmap(parent=frm_heatmap)
+        self.frm_heatmap = ttk.Frame(self)
+        self.frm_heatmap.grid(row=0, column=0, sticky="nsew")
+        self.build_frm_heatmap(parent=self.frm_heatmap)
+        self.columnconfigure(0, weight=1)
+        self.rowconfigure(0, weight=1)
 
         frm_heatmap_colorbar = ttk.Frame(self)
         frm_heatmap_colorbar.grid(row=0, column=1, sticky="nsew")
@@ -145,14 +157,18 @@ class PressureSensorGUI(tk.Tk):
         frm_controls_stats_settings.grid(row=0, column=3, sticky="nsew")
         self.build_frm_controls_stats_settings(parent=frm_controls_stats_settings)
 
-        self.columnconfigure(0, weight=1, minsize=500)
-        self.rowconfigure(0, weight=1, minsize=500)
-    
     def build_frm_heatmap(self, parent: ttk.Frame):
         # Heatmap should always have square aspect ratio. 
         # The canvas may become rectangular, but the actual data display area should be square and centered.
         # Possibly have grid lines. But even better, have little x's at the cetner of each grid cell.
-        pass
+        self.canvas_heatmap = tk.Canvas(
+            parent, bg="white", highlightthickness=0, border=0, relief="flat", 
+            width=self.state.heatmap_canvas_size[0], height=self.state.heatmap_canvas_size[1]
+        )
+        self.canvas_heatmap.grid(row=0, column=0, sticky="nsew")
+        self.canvas_heatmap.bind("<Configure>", self.on_heatmap_resize)
+        parent.columnconfigure(0, weight=1)
+        parent.rowconfigure(0, weight=1)
 
     def build_frm_heatmap_colorbar(self, parent: ttk.Frame):
         pass
@@ -191,7 +207,7 @@ class PressureSensorGUI(tk.Tk):
         lbl_data_source.grid(row=0, column=0, sticky="w")
         parent.columnconfigure(0, weight=1)
 
-        self.strvar_radiobtns_data_source = tk.StringVar(parent, value="none")
+        self.strvar_radiobtns_data_source = tk.StringVar(parent, value=self.state.data_source)
 
         radiobtn_com_port = ttk.Radiobutton(parent, 
                                             text="COM Port", 
@@ -211,14 +227,14 @@ class PressureSensorGUI(tk.Tk):
         radiobtn_recorded_data = ttk.Radiobutton(parent, 
                                                  text="Recorded Data", 
                                                  variable=self.strvar_radiobtns_data_source, 
-                                                 value="recorded_data", 
+                                                 value="recorded", 
                                                  command=self.on_radiobtn_data_source)
         radiobtn_recorded_data.grid(row=2, column=0, sticky="w")
 
         radiobtn_simulated_data = ttk.Radiobutton(parent, 
                                                   text="Simulated Data", 
                                                   variable=self.strvar_radiobtns_data_source, 
-                                                  value="simulated_data",
+                                                  value="simulated",
                                                   command=self.on_radiobtn_data_source)
         radiobtn_simulated_data.grid(row=3, column=0, sticky="w")
 
@@ -346,9 +362,20 @@ class PressureSensorGUI(tk.Tk):
 
     """ Event Handlers """
 
+    def on_heatmap_resize(self, event):
+        self.draw_heatmap(canvas_resized=True)
+        self.new_state.heatmap_canvas_size = self.canvas_heatmap.winfo_width(), self.canvas_heatmap.winfo_height()
+        self.refresh_gui()
+
     def on_radiobtn_data_source(self):
         new_source = self.strvar_radiobtns_data_source.get()
-        pass
+        if new_source == "com_port":
+            self.new_state.data_source = "com_port"
+        elif new_source == "recorded_data":
+            self.new_state.data_source = "recorded"
+        elif new_source == "simulated_data":
+            self.new_state.data_source = "simulated"
+        self.refresh_gui()
 
     def on_dropdown_select_com_port(self):
         pass
@@ -507,7 +534,8 @@ class PressureSensorGUI(tk.Tk):
 
     """ Background Thread: Continuously retrieve data and update the heatmap """
     # NOTE: all changes to GUI widgets should be done in the main thread, not in this thread.
-    # When a widget needs to be updated, use 'self.after(0, method_name)' to call a method to run in the main thread
+    # If a widget needs to be updated in this thread, 
+    # use 'self.after(0, method_name)' to call a method to run in the main thread that updates the widget
 
     def threadloop_data_update(self):
         while True:
@@ -520,11 +548,11 @@ class PressureSensorGUI(tk.Tk):
                 
             # Get new data
             if self.state.data_source == "com_port":
-                pass
+                self.data = self.get_data_from_com_port()
             elif self.state.data_source == "recorded":
-                pass
+                self.data = self.get_data_from_recorded_data()
             elif self.state.data_source == "simulated":
-                pass
+                self.data = self.get_data_simulated()
                 
             # Update the heatmap
             self.draw_heatmap()
@@ -537,8 +565,90 @@ class PressureSensorGUI(tk.Tk):
             if time_to_wait > 0:
                 time.sleep(time_to_wait)
 
+    def get_data_from_com_port(self) -> np.ndarray:
+        return np.zeros((10, 10))
+    
+    def get_data_from_recorded_data(self) -> np.ndarray:
+        return np.zeros((10, 10))
+    
+    def get_data_simulated(self) -> np.ndarray:
+        rows = 16
+        cols = 16
+        data = np.zeros((rows, cols))
+
+        # Generate heatmap data based on sine waves and the current time
+        for i in range(16):
+            for j in range(16):
+                data[i][j] = MIN_VAL + np.abs( np.sin(2 * np.pi * (j + 1/2) / rows) 
+                              * np.sin(np.pi * (i + 1/2) / cols) 
+                              * np.sin(time.time()) ) * MAX_VAL
+                
+        return data
+
     def draw_heatmap(self, canvas_resized: bool = False):
-        pass
+        # Heatmap image starts as a copy of the data
+        heatmap_image: np.ndarray = self.data.copy()
+
+        # Interpolate the data (smooth it out)
+        ndimage.zoom(heatmap_image, self.state.interp_level, order=3, mode='nearest')
+        heatmap_image = np.clip(heatmap_image, MIN_VAL, MAX_VAL)
+
+        # Build and apply a colormap to the data (making the data an RGB image)
+        normalized_data = (heatmap_image - MIN_VAL) / (MAX_VAL - MIN_VAL)
+        colormap = cmaps.get_cmap("inferno") # 'viridis', 'plasma', 'inferno', 'magma', 'cividis'
+        heatmap_image = colormap(normalized_data)[:, :, :3] # apply colormap, remove 'alpha' channel
+        heatmap_image *= 255 # Convert to 0-255 range (for RGB) rather than 0-1
+
+        # Calculate the size of each heatmap cell based on the size of the canvas
+        rows, cols = heatmap_image.shape[:2]
+        canvas_width: int = self.canvas_heatmap.winfo_width() # pixels
+        canvas_height: int = self.canvas_heatmap.winfo_height() # pixels
+        canvas_aspect_ratio: float = canvas_width / canvas_height
+        if canvas_aspect_ratio > ASPECT_RATIO: 
+            # canvas will be wider than the heatmap
+            cell_height: int = int(canvas_height / rows)
+            cell_width: int = int(cell_height / ASPECT_RATIO)
+        else: 
+            # canvas will be taller than the heatmap
+            cell_width: int = int(canvas_width / cols)
+            cell_height: int = int(cell_width * ASPECT_RATIO)
+
+        # While GUI is being built, canvas size may be 0. This prevents an error:
+        if cell_width == 0 or cell_height == 0:
+            return
+        
+        # Scale the data based on the calculated cell sizes
+        heatmap_image = np.repeat(heatmap_image, cell_width, axis=1)
+        heatmap_image = np.repeat(heatmap_image, cell_height, axis=0)
+        heatmap_image = np.ascontiguousarray(heatmap_image) # Make it a C-contiguous array for faster drawing
+        heatmap_image = heatmap_image.astype(np.uint8)
+
+        # There may be some extra space on the canvas. 
+        # Fill it in by expanding a few of the cell widths/heights by 1 pixel.
+        leftover_height: int = canvas_height - (cell_height * rows)
+        leftover_width: int = canvas_width - (cell_width * cols)
+        if canvas_aspect_ratio > ASPECT_RATIO:
+            pixels_to_add = leftover_height
+        else:
+            pixels_to_add = leftover_width
+        for pixel in range(pixels_to_add):
+            i = pixel * cell_height + int(cell_height/2)
+            j = pixel * cell_width + int(cell_width/2)
+            heatmap_image = np.insert(heatmap_image, i, heatmap_image[i, :], axis=0)
+            heatmap_image = np.insert(heatmap_image, j, heatmap_image[:, j], axis=1)
+
+        # Draw the heatmap on the canvas
+        topmost_pixel = 0 if canvas_aspect_ratio > ASPECT_RATIO else int((leftover_height - leftover_width) / 2)
+        leftmost_pixel = 0 if canvas_aspect_ratio < ASPECT_RATIO else int((leftover_width - leftover_height) / 2)
+        pil_image = Image.fromarray(heatmap_image)
+        if not hasattr(self, 'heatmap_photo') or canvas_resized:
+            self.heatmap_photo = ImageTk.PhotoImage(pil_image)
+            self.heatmap_image_id = self.canvas_heatmap.create_image(
+                leftmost_pixel, topmost_pixel, anchor="nw", image=self.heatmap_photo
+            )
+        else:
+            self.heatmap_photo.paste(pil_image)
+            self.canvas_heatmap.coords(self.heatmap_image_id, (leftmost_pixel, topmost_pixel))
 
 
     """ Helper methods """
