@@ -2,3 +2,6 @@
 .vscode
 __pycache__
 *.pyc
+pressure_sensor/PressureSensorGUI.spec
+pressure_sensor/build/
+pressure_sensor/dist/
