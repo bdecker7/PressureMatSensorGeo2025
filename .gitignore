@@ -6,3 +6,4 @@ pressure_sensor/PressureSensorGUI.spec
 pressure_sensor/build/
 pressure_sensor/dist/
 pressure_sensor/sandbox.ipynb
+pressure_sensor/PressureSensorApp.spec
