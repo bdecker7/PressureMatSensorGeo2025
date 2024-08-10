@@ -2,8 +2,8 @@ import serial.tools.list_ports as list_ports
 
 from appdirs import user_data_dir
 import numpy as np
-from scipy import ndimage
-from matplotlib import colormaps as cmaps
+# from scipy import ndimage
+from colormaps import apply_colormap
 from PIL import Image, ImageTk
 
 import sys
@@ -29,7 +29,7 @@ ASPECT_RATIO = 1.0 # Width/Height of the heatmap cells
 # This dataclass is regularly saved to a JSON file and loaded 
 # when the GUI is started so that the user's previous settings are preserved
 @dataclass
-class PressureSensorGUIState:
+class PressureSensorAppState:
     heatmap_canvas_size: tuple[int, int] = (400, 400) # (width, height) in pixels
     data_source: Literal["com_port", "recorded", "simulated"] | None = None
     com_port: str | None = None
@@ -42,7 +42,7 @@ class PressureSensorGUIState:
     data_units: Literal["raw", "lbs", "mmHg"] = "raw"
     display_vals_on_heatmap: bool = False
 
-DEFAULT_STATE = PressureSensorGUIState()
+DEFAULT_STATE = PressureSensorAppState()
 
 
 # Save directory for saving the GUI state
@@ -57,7 +57,7 @@ ICON_FILE_NAME = "icon.png"
 ICON_PATH = os.path.join(getattr(sys, "_MEIPASS", os.path.dirname(__file__)), ICON_FILE_NAME)
 
 
-class PressureSensorGUI(tk.Tk):
+class PressureSensorApp(tk.Tk):
 
     """ Initialization """
 
@@ -97,9 +97,13 @@ class PressureSensorGUI(tk.Tk):
         
         # Load in the GUI state from the JSON file
         with open(STATE_FILE_PATH, "r") as file:
-            state = json.load(file)
-            self.state = PressureSensorGUIState(**state)
-            self.new_state = PressureSensorGUIState(**state)
+            try:
+                state = json.load(file)
+                self.state = PressureSensorAppState(**state)
+                self.new_state = PressureSensorAppState(**state)
+            except TypeError:
+                self.state = deepcopy(DEFAULT_STATE)
+                self.new_state = deepcopy(DEFAULT_STATE)
 
         # Variables that are reset each time the GUI is started
         self.paused: bool = True
@@ -371,9 +375,9 @@ class PressureSensorGUI(tk.Tk):
         new_source = self.strvar_radiobtns_data_source.get()
         if new_source == "com_port":
             self.new_state.data_source = "com_port"
-        elif new_source == "recorded_data":
+        elif new_source == "recorded":
             self.new_state.data_source = "recorded"
-        elif new_source == "simulated_data":
+        elif new_source == "simulated":
             self.new_state.data_source = "simulated"
         self.refresh_gui()
 
@@ -590,13 +594,12 @@ class PressureSensorGUI(tk.Tk):
         heatmap_image: np.ndarray = self.data.copy()
 
         # Interpolate the data (smooth it out)
-        ndimage.zoom(heatmap_image, self.state.interp_level, order=3, mode='nearest')
+        # ndimage.zoom(heatmap_image, self.state.interp_level, order=3, mode='nearest')
         heatmap_image = np.clip(heatmap_image, MIN_VAL, MAX_VAL)
 
         # Build and apply a colormap to the data (making the data an RGB image)
         normalized_data = (heatmap_image - MIN_VAL) / (MAX_VAL - MIN_VAL)
-        colormap = cmaps.get_cmap("inferno") # 'viridis', 'plasma', 'inferno', 'magma', 'cividis'
-        heatmap_image = colormap(normalized_data)[:, :, :3] # apply colormap, remove 'alpha' channel
+        heatmap_image = apply_colormap(normalized_data, "inferno")
         heatmap_image *= 255 # Convert to 0-255 range (for RGB) rather than 0-1
 
         # Calculate the size of each heatmap cell based on the size of the canvas
@@ -654,6 +657,8 @@ class PressureSensorGUI(tk.Tk):
     """ Helper methods """
 
 
+
 if __name__ == "__main__":
-    app = PressureSensorGUI()
+    app = PressureSensorApp()
     app.mainloop()
+
