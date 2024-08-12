@@ -1,10 +1,11 @@
-import serial.tools.list_ports as list_ports
 
 from appdirs import user_data_dir
 import numpy as np
 # from scipy import ndimage
 from colormaps import apply_colormap
 from PIL import Image, ImageTk
+import serial.tools.list_ports as list_ports
+import serial
 
 import sys
 import os
@@ -24,6 +25,7 @@ MIN_VAL = 0
 MAX_VAL = 1023
 ASPECT_RATIO = 1.0 # Width/Height of the heatmap cells
 
+BAUD_RATE = 115200 # Bits/sec for serial communication
 
 # The state of the GUI, in terms of user selections and settings
 # This dataclass is regularly saved to a JSON file and loaded 
@@ -94,6 +96,18 @@ class PressureSensorApp(tk.Tk):
         if not os.path.exists(STATE_FILE_PATH):
             with open(STATE_FILE_PATH, "w") as file:
                 json.dump(asdict(DEFAULT_STATE), file, indent=4)
+
+        # Variables that are reset each time the GUI is started
+        self.paused: bool = False
+        self.recording: bool = False
+        self.time_recording_started: float = time.time()
+        self.available_com_ports: list[str] = [port.name for port in list_ports.comports()]
+
+        # Variable to hold the data that will be displayed on the heatmap
+        self.data: np.ndarray = np.zeros((10, 10))
+
+        # Variables for managing serial communication
+        self.serialcomm: serial.Serial = serial.Serial()
         
         # Load in the GUI state from the JSON file
         with open(STATE_FILE_PATH, "r") as file:
@@ -104,15 +118,10 @@ class PressureSensorApp(tk.Tk):
             except TypeError:
                 self.state = deepcopy(DEFAULT_STATE)
                 self.new_state = deepcopy(DEFAULT_STATE)
-
-        # Variables that are reset each time the GUI is started
-        self.paused: bool = False
-        self.recording: bool = False
-        self.time_recording_started: float = time.time()
-        self.available_com_ports: list[str] = [port.name for port in list_ports.comports()]
         
-        # Variable to hold the data that will be displayed on the heatmap
-        self.data: np.ndarray = np.zeros((10, 10))
+        if self.state.com_port not in self.available_com_ports:
+            self.state.com_port = None
+            self.new_state.com_port = None
 
     
     """ Build the GUI widgets """
@@ -222,7 +231,8 @@ class PressureSensorApp(tk.Tk):
                                             command=self.on_radiobtn_data_source)
         radiobtn_com_port.grid(row=1, column=0, sticky="w")
 
-        self.dropdown_com_port = ttk.Combobox(parent, width=6)
+        self.strvar_com_port = tk.StringVar(parent, value=self.state.com_port)
+        self.dropdown_com_port = ttk.Combobox(parent, width=10, textvariable=self.strvar_com_port)
         self.dropdown_com_port.bind("<<ComboboxSelected>>", lambda e: self.on_dropdown_select_com_port())
         self.dropdown_com_port["values"] = self.available_com_ports
         self.dropdown_com_port.grid(row=1, column=1, sticky="w")
@@ -375,16 +385,33 @@ class PressureSensorApp(tk.Tk):
 
     def on_radiobtn_data_source(self):
         new_source = self.strvar_radiobtns_data_source.get()
+        
         if new_source == "com_port":
-            self.new_state.data_source = "com_port"
+            if self.state.com_port is None:
+                self.new_state.data_source = copy(self.state.data_source)
+                self.strvar_radiobtns_data_source.set(str(self.state.data_source))
+            else:
+                self.new_state.data_source = "com_port"
+        
         elif new_source == "recorded":
             self.new_state.data_source = "recorded"
+        
         elif new_source == "simulated":
             self.new_state.data_source = "simulated"
+        
         self.refresh_gui()
 
     def on_dropdown_select_com_port(self):
-        pass
+        self.new_state.com_port = self.dropdown_com_port.get()
+        if self.state.data_source == "com_port":
+            self.close_serial()
+            try:
+                self.open_serial(self.new_state.com_port)
+            except serial.SerialException:
+                self.show_serial_opening_error(str(self.state.com_port))
+                self.new_state.com_port = None
+                self.strvar_com_port.set("")
+                self.refresh_gui()
 
     def on_btn_refresh_com_ports_list(self):
         self.available_com_ports = [port.name for port in list_ports.comports()]
@@ -417,6 +444,11 @@ class PressureSensorApp(tk.Tk):
                     self.recording = True
                     self.time_recording_started = time.time()
                     self.refresh_gui()
+            
+            else:
+                self.recording = True
+                self.time_recording_started = time.time()
+                self.refresh_gui()
         
         else:
             self.recording = False
@@ -572,8 +604,46 @@ class PressureSensorApp(tk.Tk):
                 time.sleep(time_to_wait)
 
     def get_data_from_com_port(self) -> np.ndarray:
-        return np.zeros((10, 10))
+        if self.state.com_port is None or self.state.com_port == "":
+            return np.zeros((10, 10))
+
+        # Check that the serial port is open
+        if not self.serialcomm.is_open:
+            try:
+                self.open_serial(str(self.state.com_port))
+            except serial.SerialException:
+                self.show_serial_opening_error(str(self.state.com_port))
+                self.state.com_port = None
+                self.new_state.com_port = None
+                self.strvar_com_port.set("")
+                return np.zeros((10, 10))
+        
+        # Serial port is open. Request data from the sensor:
+        self.serialcomm.write(b'\x01')
+
+        # Get the raw data from the sensor
+        raw_data: np.ndarray = self.read_int_array()
+        # TODO: calculations on the raw data, calibrations, etc...
+        return raw_data
+ 
+    def read_uint16(self) -> int:
+        vals: bytes = self.serialcomm.read(2) # read two bytes of binary data
+        value = int.from_bytes(vals, 'little') # convert the bytes to an integer
+        return value
     
+    def read_int_array(self) -> np.ndarray:
+        rows: int = self.read_uint16() # read the number of rows
+        cols: int = self.read_uint16() # read the number of columns
+        vals: bytes = self.serialcomm.read(rows * cols * 2) # read all data
+        
+        # iterate over the vals and fill the data array
+        data: np.ndarray = np.zeros((rows, cols), dtype=int)
+        for i in range(0, len(vals), 2):
+            row: int = i // (cols * 2)
+            col: int = (i // 2) % cols
+            data[row, col] = int.from_bytes(vals[i:i+2], 'little')
+        return data
+
     def get_data_from_recorded_data(self) -> np.ndarray:
         return np.zeros((10, 10))
     
@@ -658,6 +728,26 @@ class PressureSensorApp(tk.Tk):
 
     """ Helper methods """
 
+    def open_serial(self, port: str) -> bool:
+        try:
+            self.serialcomm = serial.Serial(port, BAUD_RATE, timeout=2)
+            time.sleep(0.2) # Wait for the serial port to open
+            if not self.serialcomm.is_open:
+                raise Exception("Serial port did not open")
+            return True
+        except Exception as e:
+            return False
+        
+    def close_serial(self):
+        self.serialcomm.close()
+        time.sleep(0.2) # Wait for the serial port to close
+
+    def show_serial_opening_error(self, com_port: str):
+        messagebox.showerror(
+            "Serial Port Error", 
+            f"Could not open serial port '{com_port}'\n\n." \
+                "Check that no other programs are using the COM port."
+        )
 
 
 if __name__ == "__main__":
