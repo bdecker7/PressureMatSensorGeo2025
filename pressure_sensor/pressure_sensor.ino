@@ -1,7 +1,7 @@
 // Uncomment the line below before uploading sketch to enable debugging mode
 // Data will be sent to the serial monitor instead of the python script
 
-#define DEBUG
+// #define DEBUG
 
 /*
  * Definitions:
