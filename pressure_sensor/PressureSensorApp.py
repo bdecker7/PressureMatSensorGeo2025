@@ -106,7 +106,7 @@ class PressureSensorApp(tk.Tk):
                 self.new_state = deepcopy(DEFAULT_STATE)
 
         # Variables that are reset each time the GUI is started
-        self.paused: bool = True
+        self.paused: bool = False
         self.recording: bool = False
         self.time_recording_started: float = time.time()
         self.available_com_ports: list[str] = [port.name for port in list_ports.comports()]
@@ -162,12 +162,14 @@ class PressureSensorApp(tk.Tk):
         self.build_frm_controls_stats_settings(parent=frm_controls_stats_settings)
 
     def build_frm_heatmap(self, parent: ttk.Frame):
-        # Heatmap should always have square aspect ratio. 
-        # The canvas may become rectangular, but the actual data display area should be square and centered.
-        # Possibly have grid lines. But even better, have little x's at the cetner of each grid cell.
+        # Ensure the program will not be too large for the screen
+        heatmap_width = min(self.state.heatmap_canvas_size[0], self.winfo_screenwidth()*0.7)
+        heatmap_height = min(self.state.heatmap_canvas_size[1], self.winfo_screenheight()*0.75)
+
+        # Create the canvas for the heatmap
         self.canvas_heatmap = tk.Canvas(
             parent, bg="white", highlightthickness=0, border=0, relief="flat", 
-            width=self.state.heatmap_canvas_size[0], height=self.state.heatmap_canvas_size[1]
+            width=heatmap_width, height=heatmap_height
         )
         self.canvas_heatmap.grid(row=0, column=0, sticky="nsew")
         self.canvas_heatmap.bind("<Configure>", self.on_heatmap_resize)
@@ -243,7 +245,7 @@ class PressureSensorApp(tk.Tk):
         radiobtn_simulated_data.grid(row=3, column=0, sticky="w")
 
     def build_frm_playpause_etc(self, parent: ttk.Frame):
-        self.strvar_playpause_btn = tk.StringVar(parent, value="▶")
+        self.strvar_playpause_btn = tk.StringVar(parent, value="◼")
         btn_playpause = ttk.Button(parent, textvariable=self.strvar_playpause_btn, style="PlayPause.TButton", command=self.on_btn_playpause)
         btn_playpause.grid(row=0, column=0, rowspan=2, sticky="nsew", padx=(0, self.padding))
         parent.rowconfigure(0, weight=1)
