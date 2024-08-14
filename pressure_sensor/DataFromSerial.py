@@ -10,7 +10,7 @@ class DataFromSerial:
         self.i = 0
 
         #self.serial_port = self.find_serial_port()
-        self.serial_port = "COM9" # Change this to the port of your Arduino
+        self.serial_port = "COM10" # Change this to the port of your Arduino
         # Open serial communication
         self.serialcomm = serial.Serial(self.serial_port, baudrate=115200)
         time.sleep(.01)

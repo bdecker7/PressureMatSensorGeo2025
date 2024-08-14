@@ -25,7 +25,8 @@ MIN_VAL = 0
 MAX_VAL = 1023
 ASPECT_RATIO = 1.0 # Width/Height of the heatmap cells
 
-BAUD_RATE = 115200 # Bits/sec for serial communication
+SERIAL_BAUD_RATE = 115200 # Bits/sec for serial communication
+SERIAL_COMM_SIGNAL = b'\x01' # A '1' byte: signal to request data from the Arduino, and the signal that the Arduino is ready
 
 # The state of the GUI, in terms of user selections and settings
 # This dataclass is regularly saved to a JSON file and loaded 
@@ -387,15 +388,9 @@ class PressureSensorApp(tk.Tk):
         new_source = self.strvar_radiobtns_data_source.get()
         
         if new_source == "com_port":
-            if self.state.com_port is None:
-                self.new_state.data_source = copy(self.state.data_source)
-                self.strvar_radiobtns_data_source.set(str(self.state.data_source))
-            else:
-                self.new_state.data_source = "com_port"
-        
+            self.new_state.data_source = "com_port"
         elif new_source == "recorded":
             self.new_state.data_source = "recorded"
-        
         elif new_source == "simulated":
             self.new_state.data_source = "simulated"
         
@@ -403,15 +398,7 @@ class PressureSensorApp(tk.Tk):
 
     def on_dropdown_select_com_port(self):
         self.new_state.com_port = self.dropdown_com_port.get()
-        if self.state.data_source == "com_port":
-            self.close_serial()
-            try:
-                self.open_serial(self.new_state.com_port)
-            except serial.SerialException:
-                self.show_serial_opening_error(str(self.state.com_port))
-                self.new_state.com_port = None
-                self.strvar_com_port.set("")
-                self.refresh_gui()
+        self.refresh_gui()
 
     def on_btn_refresh_com_ports_list(self):
         self.available_com_ports = [port.name for port in list_ports.comports()]
@@ -573,7 +560,7 @@ class PressureSensorApp(tk.Tk):
     """ Background Thread: Continuously retrieve data and update the heatmap """
     # NOTE: all changes to GUI widgets should be done in the main thread, not in this thread.
     # If a widget needs to be updated in this thread, 
-    # use 'self.after(0, method_name)' to call a method to run in the main thread that updates the widget
+    # use 'self.after(0, lambda: method_name)' to call a method to run in the main thread that updates the widget
 
     def threadloop_data_update(self):
         while True:
@@ -606,34 +593,38 @@ class PressureSensorApp(tk.Tk):
     def get_data_from_com_port(self) -> np.ndarray:
         if self.state.com_port is None or self.state.com_port == "":
             return np.zeros((10, 10))
+        
+        # Check if the selected com port has changed
+        if self.state.com_port != self.serialcomm.port:
+            self.close_serial()
 
-        # Check that the serial port is open
+        # Check that the serial port is open and ready
         if not self.serialcomm.is_open:
-            try:
-                self.open_serial(str(self.state.com_port))
-            except serial.SerialException:
-                self.show_serial_opening_error(str(self.state.com_port))
-                self.state.com_port = None
+            opened = self.open_serial(self.state.com_port)
+            if not opened:
+                # Set the serial port to None so that the user can select a new one
                 self.new_state.com_port = None
-                self.strvar_com_port.set("")
+                self.state.com_port = None
+                self.after(0, lambda: self.save_state())
+                self.after(0, lambda: self.strvar_com_port.set(""))
                 return np.zeros((10, 10))
         
         # Serial port is open. Request data from the sensor:
         self.serialcomm.write(b'\x01')
 
         # Get the raw data from the sensor
-        raw_data: np.ndarray = self.read_int_array()
+        raw_data: np.ndarray = self.serial_read_int_array()
         # TODO: calculations on the raw data, calibrations, etc...
         return raw_data
  
-    def read_uint16(self) -> int:
+    def serial_read_uint16(self) -> int:
         vals: bytes = self.serialcomm.read(2) # read two bytes of binary data
         value = int.from_bytes(vals, 'little') # convert the bytes to an integer
         return value
     
-    def read_int_array(self) -> np.ndarray:
-        rows: int = self.read_uint16() # read the number of rows
-        cols: int = self.read_uint16() # read the number of columns
+    def serial_read_int_array(self) -> np.ndarray:
+        rows: int = self.serial_read_uint16() # read the number of rows
+        cols: int = self.serial_read_uint16() # read the number of columns
         vals: bytes = self.serialcomm.read(rows * cols * 2) # read all data
         
         # iterate over the vals and fill the data array
@@ -666,7 +657,7 @@ class PressureSensorApp(tk.Tk):
         heatmap_image: np.ndarray = self.data.copy()
 
         # Interpolate the data (smooth it out)
-        # ndimage.zoom(heatmap_image, self.state.interp_level, order=3, mode='nearest')
+        # ndimage.zoom(heatmap_image, zoom=4, order=3, mode='nearest')
         heatmap_image = np.clip(heatmap_image, MIN_VAL, MAX_VAL)
 
         # Build and apply a colormap to the data (making the data an RGB image)
@@ -730,17 +721,39 @@ class PressureSensorApp(tk.Tk):
 
     def open_serial(self, port: str) -> bool:
         try:
-            self.serialcomm = serial.Serial(port, BAUD_RATE, timeout=2)
-            time.sleep(0.2) # Wait for the serial port to open
+            # Attempt to open serial port. May raise a SerialException.
+            self.serialcomm = serial.Serial(port, SERIAL_BAUD_RATE, timeout=4)
+            time.sleep(0.01) # Wait for the serial port to open
+            
+            # Check that the serial port opened successfully
             if not self.serialcomm.is_open:
-                raise Exception("Serial port did not open")
+                raise Exception("Serial port did not open.")
+            
+            # Wait up to 3 seconds for a signal from the Arduino that it is ready
+            ready_signal_received = False
+            start_time = time.time()
+            while time.time() - start_time < 3:
+                if self.serialcomm.in_waiting > 0:
+                    if self.serialcomm.read(size=1) == SERIAL_COMM_SIGNAL:
+                        ready_signal_received = True
+                        break
+            if not ready_signal_received:
+                raise Exception(f"Ready signal '{SERIAL_COMM_SIGNAL}' not received within 3 seconds.")
+
+            # Serial port is open and ready
             return True
-        except Exception as e:
+        
+        except (serial.SerialException, Exception) as e:
+            messagebox.showerror(
+                "Serial Port Error",
+                "Error opening serial port: \n\n" \
+                f"{str(e)}"
+            )
+            self.close_serial()
             return False
         
     def close_serial(self):
         self.serialcomm.close()
-        time.sleep(0.2) # Wait for the serial port to close
 
     def show_serial_opening_error(self, com_port: str):
         messagebox.showerror(
