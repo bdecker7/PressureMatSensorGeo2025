@@ -33,17 +33,22 @@ SERIAL_COMM_SIGNAL = b'\x01' # A '1' byte: signal to request data from the Ardui
 # when the GUI is started so that the user's previous settings are preserved
 @dataclass
 class PressureSensorAppState:
+    # Automatically determined by the App
     heatmap_canvas_size: tuple[int, int] = (400, 400) # (width, height) in pixels
+    # User selections
     data_source: Literal["com_port", "recorded", "simulated"] | None = None
     com_port: str | None = None
     frames_per_second: int | Literal["Max"] = "Max"
     recorded_data_save_directory: str | None = None
     recorded_data_filename: str = "data"
     recorded_data_append_datetime: bool = True
+    # Settings (from the "settings" window at the bottom)
+    mirror_heatmap_image: bool = False
+    rotate_heatmap_image: Literal[0, 90, 180, 270] = 0 # clockwise
     interp_level: int = 1
-    font_size: int = 11
     data_units: Literal["raw", "lbs", "mmHg"] = "raw"
     display_vals_on_heatmap: bool = False
+    font_size: int = 11
 
 DEFAULT_STATE = PressureSensorAppState()
 
@@ -212,10 +217,11 @@ class PressureSensorApp(tk.Tk):
         frm_stats.grid(row=6, column=0, sticky="ew")
         self.build_frm_stats(parent=frm_stats)
 
-        ttk.Separator(parent, orient="horizontal").grid(row=7, column=0, sticky="ew", pady=self.padding)
+        parent.rowconfigure(7, weight=1) # Empty row that is allowed to expand (empty space)
+        ttk.Separator(parent, orient="horizontal").grid(row=8, column=0, sticky="ew", pady=self.padding)
 
         frm_settings = ttk.Frame(parent)
-        frm_settings.grid(row=8, column=0, sticky="ew")
+        frm_settings.grid(row=9, column=0, sticky="ew")
         self.build_frm_settings(parent=frm_settings)
 
     def build_frm_data_source(self, parent: ttk.Frame):
@@ -364,16 +370,41 @@ class PressureSensorApp(tk.Tk):
 
     def build_frm_settings(self, parent: ttk.Frame):
         lbl_settings = ttk.Label(parent, text="Settings", style="Header.TLabel")
-        lbl_settings.grid(row=0, column=0, columnspan=3, sticky="w")
+        lbl_settings.grid(row=0, column=0, sticky="w")
         parent.columnconfigure(0, weight=1)
 
-        lbl_font_size = ttk.Label(parent, text="Font Size")
-        lbl_font_size.grid(row=1, column=0, sticky="w")
+        # Image rotation and mirroring
+        frm_settings_image_rotation_mirror = ttk.Frame(parent)
+        frm_settings_image_rotation_mirror.grid(row=1, column=0, sticky="nsew")
 
-        btn_decrease_font_size = ttk.Button(parent, text="-", command=self.on_btn_decrease_font_size)
+        lbl_image_orientaion = ttk.Label(frm_settings_image_rotation_mirror, text="Image Orientation")
+        lbl_image_orientaion.grid(row=0, column=0, sticky="ew")
+        frm_settings_image_rotation_mirror.columnconfigure(0, weight=1)
+
+        self.bvar_chkbtn_mirror_image = tk.BooleanVar(frm_settings_image_rotation_mirror, value=self.state.mirror_heatmap_image)
+        chkbtn_mirror_image = ttk.Checkbutton(
+            frm_settings_image_rotation_mirror, variable=self.bvar_chkbtn_mirror_image, text="Mirror", command=self.on_chkbtn_mirror_heatmap_image
+        )
+        chkbtn_mirror_image.grid(row=0, column=1, sticky="ew")
+
+        icon: str = "\u27F3" if self.state.mirror_heatmap_image else "\u27F2"
+        self.strvar_btn_rotate_image = tk.StringVar(frm_settings_image_rotation_mirror, value=f"Rotate {icon}")
+        btn_rotate_image = ttk.Button(frm_settings_image_rotation_mirror, textvariable=self.strvar_btn_rotate_image, width=8, command=self.on_btn_rotate_heatmap_image)
+        btn_rotate_image.grid(row=0, column=2, sticky="ew")
+
+
+        # Font Size
+        frm_settings_font_size = ttk.Frame(parent)
+        frm_settings_font_size.grid(row=2, column=0, sticky="nsew")
+
+        lbl_font_size = ttk.Label(frm_settings_font_size, text="Font Size")
+        lbl_font_size.grid(row=1, column=0, sticky="w")
+        frm_settings_font_size.columnconfigure(0, weight=1)
+
+        btn_decrease_font_size = ttk.Button(frm_settings_font_size, text="-", width=3, command=self.on_btn_decrease_font_size)
         btn_decrease_font_size.grid(row=1, column=1, sticky="w")
 
-        btn_increase_font_size = ttk.Button(parent, text="+", command=self.on_btn_increase_font_size)
+        btn_increase_font_size = ttk.Button(frm_settings_font_size, text="+", width=3, command=self.on_btn_increase_font_size)
         btn_increase_font_size.grid(row=1, column=2, sticky="w")
 
 
@@ -481,6 +512,24 @@ class PressureSensorApp(tk.Tk):
                 self.style.configure(style, font=(font_name, font_size + 1, "bold"))
             else:
                 self.style.configure(style, font=(font_name, font_size + 1))     
+
+    def on_chkbtn_mirror_heatmap_image(self):
+        self.new_state.mirror_heatmap_image = self.bvar_chkbtn_mirror_image.get()
+        icon: str = "\u27F3" if self.new_state.mirror_heatmap_image else "\u27F2"
+        self.strvar_btn_rotate_image.set(f"Rotate {icon}")
+        self.refresh_gui()
+
+    def on_btn_rotate_heatmap_image(self):
+        if self.state.rotate_heatmap_image == 270:
+            self.new_state.rotate_heatmap_image = 0
+        elif self.state.rotate_heatmap_image == 180:
+            self.new_state.rotate_heatmap_image = 270
+        elif self.state.rotate_heatmap_image == 90:
+            self.new_state.rotate_heatmap_image = 180
+        else:
+            self.new_state.rotate_heatmap_image = 90
+
+        self.refresh_gui()
 
 
     """ Refresh the GUI """
@@ -603,6 +652,7 @@ class PressureSensorApp(tk.Tk):
             opened = self.open_serial(self.state.com_port)
             if not opened:
                 # Set the serial port to None so that the user can select a new one
+                # and to prevent the program from trying to open the same port again
                 self.new_state.com_port = None
                 self.state.com_port = None
                 self.after(0, lambda: self.save_state())
@@ -646,15 +696,27 @@ class PressureSensorApp(tk.Tk):
         # Generate heatmap data based on sine waves and the current time
         for i in range(16):
             for j in range(16):
-                data[i][j] = MIN_VAL + np.abs( np.sin(2 * np.pi * (j + 1/2) / rows) 
-                              * np.sin(np.pi * (i + 1/2) / cols) 
-                              * np.sin(time.time()) ) * MAX_VAL
+                data[i][j] = MIN_VAL + MAX_VAL * np.clip(
+                    np.sin(2*np.pi*(j+1/2)/rows) * np.sin(np.pi*(i+1/2)/cols) * np.sin(time.time()), 0, 1
+                )
                 
         return data
 
     def draw_heatmap(self, canvas_resized: bool = False):
+        # TODO: rotating, mirroring, and if there is no data what to do
+
         # Heatmap image starts as a copy of the data
         heatmap_image: np.ndarray = self.data.copy()
+
+        # Rotate and/or mirror the image as needed
+        if self.state.rotate_heatmap_image == 90:
+            heatmap_image = np.rot90(heatmap_image)
+        elif self.state.rotate_heatmap_image == 180:
+            heatmap_image = np.rot90(heatmap_image, 2)
+        elif self.state.rotate_heatmap_image == 270:
+            heatmap_image = np.rot90(heatmap_image, 3)
+        if self.state.mirror_heatmap_image:
+            heatmap_image = np.fliplr(heatmap_image)
 
         # Interpolate the data (smooth it out)
         # ndimage.zoom(heatmap_image, zoom=4, order=3, mode='nearest')
@@ -754,13 +816,6 @@ class PressureSensorApp(tk.Tk):
         
     def close_serial(self):
         self.serialcomm.close()
-
-    def show_serial_opening_error(self, com_port: str):
-        messagebox.showerror(
-            "Serial Port Error", 
-            f"Could not open serial port '{com_port}'\n\n." \
-                "Check that no other programs are using the COM port."
-        )
 
 
 if __name__ == "__main__":
