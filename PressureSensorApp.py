@@ -28,6 +28,17 @@ ASPECT_RATIO = 1.0 # Width/Height of the heatmap cells
 SERIAL_BAUD_RATE = 115200 # Bits/sec for serial communication
 SERIAL_COMM_SIGNAL = b'\x01' # A '1' byte: signal to request data from the Arduino, and the signal that the Arduino is ready
 
+# Save directory for saving the GUI state
+SAVE_DIR = user_data_dir("PressureSensorApp", "BYU_GEO_GlobalEngineeringOutreach")
+if not os.path.exists(SAVE_DIR):
+    os.makedirs(SAVE_DIR)
+STATE_FILE_PATH = os.path.join(SAVE_DIR, "gui_state.json")
+
+# Location of the GUI Icon
+ICON_FILE_NAME = "icon.png"
+ICON_PATH = os.path.join(getattr(sys, "_MEIPASS", os.path.dirname(__file__)), ICON_FILE_NAME)
+
+
 # The state of the GUI, in terms of user selections and settings
 # This dataclass is regularly saved to a JSON file and loaded 
 # when the GUI is started so that the user's previous settings are preserved
@@ -53,21 +64,11 @@ class PressureSensorAppState:
 DEFAULT_STATE = PressureSensorAppState()
 
 
-# Save directory for saving the GUI state
-SAVE_DIR = user_data_dir("PressureSensorApp", "BYU_GEO_GlobalEngineeringOutreach")
-if not os.path.exists(SAVE_DIR):
-    os.makedirs(SAVE_DIR)
-STATE_FILE_PATH = os.path.join(SAVE_DIR, "gui_state.json")
-
-
-# Location of the GUI Icon
-ICON_FILE_NAME = "icon.png"
-ICON_PATH = os.path.join(getattr(sys, "_MEIPASS", os.path.dirname(__file__)), ICON_FILE_NAME)
-
-
 class PressureSensorApp(tk.Tk):
-
-    """ Initialization """
+    
+    ################################################################################################
+    # Initialization
+    ################################################################################################
 
     def __init__(self):
         super().__init__()
@@ -93,16 +94,7 @@ class PressureSensorApp(tk.Tk):
         self.destroy()
         sys.exit(0)
 
-    def save_state(self):
-        with open(STATE_FILE_PATH, "w") as file:
-            json.dump(asdict(self.state), file, indent=4)
-
     def initialize_variables(self):
-        # Create the GUI state JSON file if it doesn't exist
-        if not os.path.exists(STATE_FILE_PATH):
-            with open(STATE_FILE_PATH, "w") as file:
-                json.dump(asdict(DEFAULT_STATE), file, indent=4)
-
         # Variables that are reset each time the GUI is started
         self.paused: bool = False
         self.recording: bool = False
@@ -115,22 +107,29 @@ class PressureSensorApp(tk.Tk):
         # Variables for managing serial communication
         self.serialcomm: serial.Serial = serial.Serial()
         
+        # Create the GUI state JSON file if it doesn't exist
+        if not os.path.exists(STATE_FILE_PATH):
+            with open(STATE_FILE_PATH, "w") as file:
+                json.dump(asdict(DEFAULT_STATE), file, indent=4)
+
         # Load in the GUI state from the JSON file
         with open(STATE_FILE_PATH, "r") as file:
             try:
                 state = json.load(file)
-                self.state = PressureSensorAppState(**state)
+                self.app_state = PressureSensorAppState(**state)
                 self.new_state = PressureSensorAppState(**state)
             except TypeError:
-                self.state = deepcopy(DEFAULT_STATE)
+                self.app_state = deepcopy(DEFAULT_STATE)
                 self.new_state = deepcopy(DEFAULT_STATE)
         
-        if self.state.com_port not in self.available_com_ports:
-            self.state.com_port = None
+        if self.app_state.com_port not in self.available_com_ports:
+            self.app_state.com_port = None
             self.new_state.com_port = None
 
     
-    """ Build the GUI widgets """
+    ################################################################################################
+    # Build the GUI widgets
+    ################################################################################################
 
     def setup_gui_styles(self):
         self.padding = 10
@@ -160,7 +159,7 @@ class PressureSensorApp(tk.Tk):
     def build_gui(self):
         self.configure(padx=self.padding, pady=self.padding)
 
-        self.frm_heatmap = ttk.Frame(self)
+        self.frm_heatmap = ttk.Frame(master=self)
         self.frm_heatmap.grid(row=0, column=0, sticky="nsew")
         self.build_frm_heatmap(parent=self.frm_heatmap)
         self.columnconfigure(0, weight=1)
@@ -178,8 +177,8 @@ class PressureSensorApp(tk.Tk):
 
     def build_frm_heatmap(self, parent: ttk.Frame):
         # Ensure the program will not be too large for the screen
-        heatmap_width = min(self.state.heatmap_canvas_size[0], self.winfo_screenwidth()*0.7)
-        heatmap_height = min(self.state.heatmap_canvas_size[1], self.winfo_screenheight()*0.75)
+        heatmap_width = min(self.app_state.heatmap_canvas_size[0], self.winfo_screenwidth()*0.7)
+        heatmap_height = min(self.app_state.heatmap_canvas_size[1], self.winfo_screenheight()*0.75)
 
         # Create the canvas for the heatmap
         self.canvas_heatmap = tk.Canvas(
@@ -229,7 +228,7 @@ class PressureSensorApp(tk.Tk):
         lbl_data_source.grid(row=0, column=0, sticky="w")
         parent.columnconfigure(0, weight=1)
 
-        self.strvar_radiobtns_data_source = tk.StringVar(parent, value=self.state.data_source)
+        self.strvar_radiobtns_data_source = tk.StringVar(parent, value=self.app_state.data_source)
 
         radiobtn_com_port = ttk.Radiobutton(parent, 
                                             text="COM Port", 
@@ -238,7 +237,7 @@ class PressureSensorApp(tk.Tk):
                                             command=self.on_radiobtn_data_source)
         radiobtn_com_port.grid(row=1, column=0, sticky="w")
 
-        self.strvar_com_port = tk.StringVar(parent, value=self.state.com_port)
+        self.strvar_com_port = tk.StringVar(parent, value=self.app_state.com_port)
         self.dropdown_com_port = ttk.Combobox(parent, width=10, textvariable=self.strvar_com_port)
         self.dropdown_com_port.bind("<<ComboboxSelected>>", lambda e: self.on_dropdown_select_com_port())
         self.dropdown_com_port["values"] = self.available_com_ports
@@ -381,13 +380,13 @@ class PressureSensorApp(tk.Tk):
         lbl_image_orientaion.grid(row=0, column=0, sticky="ew")
         frm_settings_image_rotation_mirror.columnconfigure(0, weight=1)
 
-        self.bvar_chkbtn_mirror_image = tk.BooleanVar(frm_settings_image_rotation_mirror, value=self.state.mirror_heatmap_image)
+        self.bvar_chkbtn_mirror_image = tk.BooleanVar(frm_settings_image_rotation_mirror, value=self.app_state.mirror_heatmap_image)
         chkbtn_mirror_image = ttk.Checkbutton(
             frm_settings_image_rotation_mirror, variable=self.bvar_chkbtn_mirror_image, text="Mirror", command=self.on_chkbtn_mirror_heatmap_image
         )
         chkbtn_mirror_image.grid(row=0, column=1, sticky="ew")
 
-        icon: str = "\u27F3" if self.state.mirror_heatmap_image else "\u27F2"
+        icon: str = "\u27F3" if self.app_state.mirror_heatmap_image else "\u27F2"
         self.strvar_btn_rotate_image = tk.StringVar(frm_settings_image_rotation_mirror, value=f"Rotate {icon}")
         btn_rotate_image = ttk.Button(frm_settings_image_rotation_mirror, textvariable=self.strvar_btn_rotate_image, width=8, command=self.on_btn_rotate_heatmap_image)
         btn_rotate_image.grid(row=0, column=2, sticky="ew")
@@ -408,7 +407,9 @@ class PressureSensorApp(tk.Tk):
         btn_increase_font_size.grid(row=1, column=2, sticky="w")
 
 
-    """ Event Handlers """
+    ################################################################################################
+    # Event Handlers
+    ################################################################################################
 
     def on_heatmap_resize(self, event):
         self.draw_heatmap(canvas_resized=True)
@@ -447,13 +448,13 @@ class PressureSensorApp(tk.Tk):
 
     def on_btn_record(self):
         if not self.recording:
-            if not self.state.recorded_data_save_directory or not self.state.recorded_data_filename:
+            if not self.app_state.recorded_data_save_directory or not self.app_state.recorded_data_filename:
                 return
 
-            save_name: str = self.state.recorded_data_filename
-            if self.state.recorded_data_append_datetime:
+            save_name: str = self.app_state.recorded_data_filename
+            if self.app_state.recorded_data_append_datetime:
                 save_name += "_" + time.strftime("%Y-%m-%d_%H-%M-%S")
-            save_path = os.path.join(self.state.recorded_data_save_directory, save_name + ".csv")
+            save_path = os.path.join(self.app_state.recorded_data_save_directory, save_name + ".csv")
             
             # Ask user if they want to overwrite the existing file
             if os.path.exists(save_path):
@@ -520,11 +521,11 @@ class PressureSensorApp(tk.Tk):
         self.refresh_gui()
 
     def on_btn_rotate_heatmap_image(self):
-        if self.state.rotate_heatmap_image == 270:
+        if self.app_state.rotate_heatmap_image == 270:
             self.new_state.rotate_heatmap_image = 0
-        elif self.state.rotate_heatmap_image == 180:
+        elif self.app_state.rotate_heatmap_image == 180:
             self.new_state.rotate_heatmap_image = 270
-        elif self.state.rotate_heatmap_image == 90:
+        elif self.app_state.rotate_heatmap_image == 90:
             self.new_state.rotate_heatmap_image = 180
         else:
             self.new_state.rotate_heatmap_image = 90
@@ -532,12 +533,15 @@ class PressureSensorApp(tk.Tk):
         self.refresh_gui()
 
 
-    """ Refresh the GUI """
+    ################################################################################################
+    # Refresh the GUI 
+    ################################################################################################
     # These methods do NOT update the heatmap or anything else that updates continuously. 
     # That is done in a background thread.
     # These functions update the visual state of the GUI widgets (such as disabling or enabling widgets).
     # Most of the event handlers (above) will call 'refresh_gui()' to visually reflect a new GUI state after 
     # a button is clicked or a selection is made.
+    ################################################################################################
 
     def refresh_gui(self):
         self.refresh_frm_data_source()
@@ -547,8 +551,8 @@ class PressureSensorApp(tk.Tk):
         self.refresh_frm_settings()
 
         # Save the new state
-        self.state = deepcopy(self.new_state)
-        self.save_state()
+        self.app_state = deepcopy(self.new_state)
+        self.save_app_state()
 
         # Force the GUI to update the display
         self.update_idletasks()
@@ -582,7 +586,7 @@ class PressureSensorApp(tk.Tk):
             self.btn_record.configure(state="normal")
 
         # Update the displayed directory name
-        if self.new_state.recorded_data_save_directory != self.state.recorded_data_save_directory:
+        if self.new_state.recorded_data_save_directory != self.app_state.recorded_data_save_directory:
             lbl_width = self.lbl_recording_directory.winfo_width() # width of label in pixels
             font_name, font_size = self.style.lookup(self.lbl_recording_directory.cget("style"), "font").split()[:2]
             char_width = tkfont.Font(family=font_name, size=int(font_size)).measure("d") # width of a character in pixels
@@ -606,10 +610,13 @@ class PressureSensorApp(tk.Tk):
         pass
 
 
-    """ Background Thread: Continuously retrieve data and update the heatmap """
+    ################################################################################################
+    # Background Thread: Continuously retrieve data and update the heatmap 
+    ################################################################################################
     # NOTE: all changes to GUI widgets should be done in the main thread, not in this thread.
-    # If a widget needs to be updated in this thread, 
-    # use 'self.after(0, lambda: method_name)' to call a method to run in the main thread that updates the widget
+    # If a widget needs to be updated in this thread, use 'self.after(0, lambda: method_name)' 
+    # to call a method to run in the main thread that updates the widget
+    ################################################################################################
 
     def threadloop_data_update(self):
         while True:
@@ -621,41 +628,41 @@ class PressureSensorApp(tk.Tk):
                 continue
                 
             # Get new data
-            if self.state.data_source == "com_port":
+            if self.app_state.data_source == "com_port":
                 self.data = self.get_data_from_com_port()
-            elif self.state.data_source == "recorded":
+            elif self.app_state.data_source == "recorded":
                 self.data = self.get_data_from_recorded_data()
-            elif self.state.data_source == "simulated":
+            elif self.app_state.data_source == "simulated":
                 self.data = self.get_data_simulated()
                 
             # Update the heatmap
             self.draw_heatmap()
 
             # Wait until the next frame should happen
-            if self.state.frames_per_second == "Max":
+            if self.app_state.frames_per_second == "Max":
                 continue
-            time_per_frame = 1 / self.state.frames_per_second
+            time_per_frame = 1 / self.app_state.frames_per_second
             time_to_wait = time_per_frame - (time.time() - update_started)
             if time_to_wait > 0:
                 time.sleep(time_to_wait)
 
     def get_data_from_com_port(self) -> np.ndarray:
-        if self.state.com_port is None or self.state.com_port == "":
+        if self.app_state.com_port is None or self.app_state.com_port == "":
             return np.zeros((10, 10))
         
         # Check if the selected com port has changed
-        if self.state.com_port != self.serialcomm.port:
+        if self.app_state.com_port != self.serialcomm.port:
             self.close_serial()
 
         # Check that the serial port is open and ready
         if not self.serialcomm.is_open:
-            opened = self.open_serial(self.state.com_port)
+            opened = self.open_serial(self.app_state.com_port)
             if not opened:
                 # Set the serial port to None so that the user can select a new one
                 # and to prevent the program from trying to open the same port again
                 self.new_state.com_port = None
-                self.state.com_port = None
-                self.after(0, lambda: self.save_state())
+                self.app_state.com_port = None
+                self.after(0, lambda: self.save_app_state())
                 self.after(0, lambda: self.strvar_com_port.set(""))
                 return np.zeros((10, 10))
         
@@ -709,13 +716,13 @@ class PressureSensorApp(tk.Tk):
         heatmap_image: np.ndarray = self.data.copy()
 
         # Rotate and/or mirror the image as needed
-        if self.state.rotate_heatmap_image == 90:
+        if self.app_state.rotate_heatmap_image == 90:
             heatmap_image = np.rot90(heatmap_image)
-        elif self.state.rotate_heatmap_image == 180:
+        elif self.app_state.rotate_heatmap_image == 180:
             heatmap_image = np.rot90(heatmap_image, 2)
-        elif self.state.rotate_heatmap_image == 270:
+        elif self.app_state.rotate_heatmap_image == 270:
             heatmap_image = np.rot90(heatmap_image, 3)
-        if self.state.mirror_heatmap_image:
+        if self.app_state.mirror_heatmap_image:
             heatmap_image = np.fliplr(heatmap_image)
 
         # Interpolate the data (smooth it out)
@@ -779,7 +786,9 @@ class PressureSensorApp(tk.Tk):
             self.canvas_heatmap.coords(self.heatmap_image_id, (leftmost_pixel, topmost_pixel))
 
 
-    """ Helper methods """
+    ################################################################################################
+    # Helper methods 
+    ################################################################################################
 
     def open_serial(self, port: str) -> bool:
         try:
@@ -816,6 +825,10 @@ class PressureSensorApp(tk.Tk):
         
     def close_serial(self):
         self.serialcomm.close()
+
+    def save_app_state(self):
+        with open(STATE_FILE_PATH, "w") as file:
+            json.dump(asdict(self.app_state), file, indent=4)
 
 
 if __name__ == "__main__":
