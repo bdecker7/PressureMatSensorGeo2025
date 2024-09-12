@@ -32,6 +32,7 @@ SERIAL_COMM_SIGNAL = b'\x01' # A '1' byte: signal to request data from the Ardui
 SAVE_DIR = user_data_dir("PressureSensorApp", "BYU_GEO_GlobalEngineeringOutreach")
 if not os.path.exists(SAVE_DIR):
     os.makedirs(SAVE_DIR)
+print(SAVE_DIR)
 STATE_FILE_PATH = os.path.join(SAVE_DIR, "gui_state.json")
 
 # Location of the GUI Icon
