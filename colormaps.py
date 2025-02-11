@@ -1,6 +1,6 @@
 import numpy as np
 from typing import Literal
-#this is a test
+
 
 VIRIDIS = np.array([
     [0.26700, 0.00487, 0.32942],
