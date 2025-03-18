@@ -18,6 +18,7 @@ from typing import Literal
 from copy import copy, deepcopy
 import threading
 import time
+import cv2
 
 
 # Constants
@@ -776,15 +777,68 @@ class PressureSensorApp(tk.Tk):
         # Draw the heatmap on the canvas
         topmost_pixel = 0 if canvas_aspect_ratio > ASPECT_RATIO else int((leftover_height - leftover_width) / 2)
         leftmost_pixel = 0 if canvas_aspect_ratio < ASPECT_RATIO else int((leftover_width - leftover_height) / 2)
-        pil_image = Image.fromarray(heatmap_image)
+        pil_image = Image.fromarray(heatmap_image)       #this is what makes the actual heatmap from the data array
         if not hasattr(self, 'heatmap_photo') or canvas_resized:
-            self.heatmap_photo = ImageTk.PhotoImage(pil_image)
+            self.heatmap_photo = ImageTk.PhotoImage(pil_image)     
             self.heatmap_image_id = self.canvas_heatmap.create_image(
                 leftmost_pixel, topmost_pixel, anchor="nw", image=self.heatmap_photo
             )
         else:
             self.heatmap_photo.paste(pil_image)
             self.canvas_heatmap.coords(self.heatmap_image_id, (leftmost_pixel, topmost_pixel))
+
+        self.array_for_recorded_data = heatmap_image
+        
+        # Save the heatmap data to files
+        #this save the data as NumPy binary format (.npy) . This is important for doing the recorded data.
+        # self.save_heatmap_data(heatmap_image, "heatmap_data.npy", "heatmap_image.png")
+
+            # Save the heatmap frame
+        frame_number = getattr(self, 'frame_number', 0)
+        self.save_heatmap_frame(heatmap_image, frame_number, "heatmap_frames")
+        self.frame_number = frame_number + 1
+
+        # Optionally, create the video after a certain number of frames
+        if self.frame_number >= 1000:  # For example, after 1000 frames
+            self.create_video_from_frames("heatmap_frames", "heatmap_video.mp4", fps=30)
+#test
+    def save_heatmap_frame(self, heatmap_image: np.ndarray, frame_number: int, folder: str):
+    # Convert the heatmap to an image
+        pil_image = Image.fromarray(heatmap_image.astype(np.uint8))
+        frame_path = f"{folder}/frame_{frame_number:05d}.png"
+        pil_image.save(frame_path)
+
+    def create_video_from_frames(self, folder: str, video_filename: str, fps: int):
+    # Get the list of frame files
+        frame_files = sorted([f for f in os.listdir(folder) if f.startswith("frame_") and f.endswith(".png")])
+        if not frame_files:
+            return
+            # Read the first frame to get the dimensions
+        first_frame = cv2.imread(os.path.join(folder, frame_files[0]))
+        height, width, layers = first_frame.shape
+
+        # Initialize the video writer
+        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+        video = cv2.VideoWriter(video_filename, fourcc, fps, (width, height))
+
+        # Write each frame to the video
+        for frame_file in frame_files:
+            frame = cv2.imread(os.path.join(folder, frame_file))
+            video.write(frame)
+
+        # Release the video writer
+        video.release()
+
+    def save_heatmap_data(self, heatmap_image: np.ndarray, data_filename: str, image_filename: str):
+    # Save the heatmap data as a NumPy binary file
+        np.save(data_filename, heatmap_image)
+    
+    # Save the heatmap as an image
+        pil_image = Image.fromarray(heatmap_image.astype(np.uint8))
+        pil_image.save(image_filename)
+
+
+
 
 
     ################################################################################################
