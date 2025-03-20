@@ -456,10 +456,11 @@ class PressureSensorApp(tk.Tk):
             save_name: str = self.app_state.recorded_data_filename
             if self.app_state.recorded_data_append_datetime:
                 save_name += "_" + time.strftime("%Y-%m-%d_%H-%M-%S")
-            save_path = os.path.join(self.app_state.recorded_data_save_directory, save_name + ".csv")
+                os.path.join(self.app_state.recorded_data_save_directory, save_name)
+                self.save_path= os.path.join(self.app_state.recorded_data_save_directory, save_name)
             
             # Ask user if they want to overwrite the existing file
-            if os.path.exists(save_path):
+            if os.path.exists(self.save_path):
                 prompt = f"File '{save_name}' already exists. Recording will overwrite the file. Continue?"
                 if messagebox.askyesno("Overwrite File", prompt):
                     self.recording = True
@@ -794,19 +795,27 @@ class PressureSensorApp(tk.Tk):
         # self.save_heatmap_data(heatmap_image, "heatmap_data.npy", "heatmap_image.png")
 
             # Save the heatmap frame
-        frame_number = getattr(self, 'frame_number', 0)
-        self.save_heatmap_frame(heatmap_image, frame_number, "heatmap_frames")
-        self.frame_number = frame_number + 1
+        if self.recording:
+            frame_number = getattr(self, 'frame_number', 0)
+            self.save_heatmap_frame(heatmap_image, frame_number, self.save_path)
+            self.frame_number = frame_number + 1
 
-        # Optionally, create the video after a certain number of frames
-        if self.frame_number >= 1000:  # For example, after 1000 frames
-            self.create_video_from_frames("heatmap_frames", "heatmap_video.mp4", fps=30)
+            # Optionally, create the video after a certain number of frames
+            if self.frame_number >= 1000:  # For example, after 1000 frames
+                self.create_video_from_frames(self.save_path, "heatmap_video.mp4", fps=30)
 #test
     def save_heatmap_frame(self, heatmap_image: np.ndarray, frame_number: int, folder: str):
     # Convert the heatmap to an image
         pil_image = Image.fromarray(heatmap_image.astype(np.uint8))
-        frame_path = f"{folder}/frame_{frame_number:05d}.png"
-        pil_image.save(frame_path)
+        if not os.path.exists(folder):
+            print(folder)
+            #os.path.join(self.new_state.recorded_data_save_directory, self.save_path)
+        else:
+            if not os.path.exists(f"{folder}/frame_{frame_number:05d}.png"):
+                frame_path = os.path.join(folder, f"frame_{frame_number:05d}.png")
+            pil_image.save(frame_path)
+        
+
 
     def create_video_from_frames(self, folder: str, video_filename: str, fps: int):
     # Get the list of frame files
