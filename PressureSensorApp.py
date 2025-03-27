@@ -786,7 +786,7 @@ class PressureSensorApp(tk.Tk):
             )
         else:
             self.heatmap_photo.paste(pil_image)
-            self.canvas_heatmap.coords(self.heatmap_image_id, (leftmost_pixel, topmost_pixel))
+            self.canvas_heatmap.coords(self.heatmap_image_id, (leftmost_pixel, topmost_pixel)) #error with input arguments
 
         self.array_for_recorded_data = heatmap_image
         
@@ -797,27 +797,34 @@ class PressureSensorApp(tk.Tk):
             # Save the heatmap frame
         if self.recording:
             frame_number = getattr(self, 'frame_number', 0)
-            self.save_heatmap_frame(heatmap_image, frame_number, self.save_path)
-            self.frame_number = frame_number + 1
+            #self.save_heatmap_frame(heatmap_image, frame_number, self.save_path)
+            #self.frame_number = frame_number + 1
+            self.create_video_from_frames(self, self.save_path, "heatmap_video.mp4", 30, pil_image)
 
             # Optionally, create the video after a certain number of frames
-            if self.frame_number >= 1000:  # For example, after 1000 frames
-                self.create_video_from_frames(self.save_path, "heatmap_video.mp4", fps=30)
+            # if self.frame_number >= 100:  # For example, after 1000 frames
+            #     self.create_video_from_frames(self.save_path, "heatmap_video.mp4", fps=30)
 #test
     def save_heatmap_frame(self, heatmap_image: np.ndarray, frame_number: int, folder: str):
     # Convert the heatmap to an image
         pil_image = Image.fromarray(heatmap_image.astype(np.uint8))
         if not os.path.exists(folder):
-            print(folder)
+            try:
+                os.makedirs(folder)
+                print(folder)
+            except Exception as e:
+                    print("error from folder")
             #os.path.join(self.new_state.recorded_data_save_directory, self.save_path)
         else:
             if not os.path.exists(f"{folder}/frame_{frame_number:05d}.png"):
                 frame_path = os.path.join(folder, f"frame_{frame_number:05d}.png")
             pil_image.save(frame_path)
+            # create the video
+            self.create_video_from_frames(self, folder, "heatmap_video.mp4", 30, pil_image)
         
 
 
-    def create_video_from_frames(self, folder: str, video_filename: str, fps: int):
+    def create_video_from_frames(self, folder: str, video_filename: str, fps: int, frame_to_add: Image):
     # Get the list of frame files
         frame_files = sorted([f for f in os.listdir(folder) if f.startswith("frame_") and f.endswith(".png")])
         if not frame_files:
@@ -831,9 +838,8 @@ class PressureSensorApp(tk.Tk):
         video = cv2.VideoWriter(video_filename, fourcc, fps, (width, height))
 
         # Write each frame to the video
-        for frame_file in frame_files:
-            frame = cv2.imread(os.path.join(folder, frame_file))
-            video.write(frame)
+        #frame = cv2.imread(os.path.join(folder, frame_file))
+        video.write(frame_to_add)
 
         # Release the video writer
         video.release()
