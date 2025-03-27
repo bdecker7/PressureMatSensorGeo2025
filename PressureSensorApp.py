@@ -40,6 +40,9 @@ STATE_FILE_PATH = os.path.join(SAVE_DIR, "gui_state.json")
 ICON_FILE_NAME = "icon.png"
 ICON_PATH = os.path.join(getattr(sys, "_MEIPASS", os.path.dirname(__file__)), ICON_FILE_NAME)
 
+#for recorded video
+video = None
+
 
 # The state of the GUI, in terms of user selections and settings
 # This dataclass is regularly saved to a JSON file and loaded 
@@ -93,6 +96,8 @@ class PressureSensorApp(tk.Tk):
         self.thread_data_update.start()
 
     def on_close(self):
+        if video is not None:
+            self.video.release()
         self.destroy()
         sys.exit(0)
 
@@ -566,6 +571,9 @@ class PressureSensorApp(tk.Tk):
     def refresh_frm_playpause_etc(self):
         if self.paused:
             self.strvar_playpause_btn.set("▶")
+            # close video
+            if video is not None:
+                self.video.release()
         else:
             self.strvar_playpause_btn.set("◼")
 
@@ -797,14 +805,11 @@ class PressureSensorApp(tk.Tk):
             # Save the heatmap frame
         if self.recording:
             frame_number = getattr(self, 'frame_number', 0)
-            #self.save_heatmap_frame(heatmap_image, frame_number, self.save_path)
-            #self.frame_number = frame_number + 1
-            self.create_video_from_frames(self, self.save_path, "heatmap_video.mp4", 30, pil_image)
+            if frame_number == 0:
+                self.save_heatmap_frame(heatmap_image, frame_number, self.save_path)
+            frame_number = frame_number + 1
+            self.create_video_from_frames("heatmap_video.mp4", 30, self.array_for_recorded_data)
 
-            # Optionally, create the video after a certain number of frames
-            # if self.frame_number >= 100:  # For example, after 1000 frames
-            #     self.create_video_from_frames(self.save_path, "heatmap_video.mp4", fps=30)
-#test
     def save_heatmap_frame(self, heatmap_image: np.ndarray, frame_number: int, folder: str):
     # Convert the heatmap to an image
         pil_image = Image.fromarray(heatmap_image.astype(np.uint8))
@@ -812,37 +817,31 @@ class PressureSensorApp(tk.Tk):
             try:
                 os.makedirs(folder)
                 print(folder)
+
             except Exception as e:
                     print("error from folder")
             #os.path.join(self.new_state.recorded_data_save_directory, self.save_path)
         else:
             if not os.path.exists(f"{folder}/frame_{frame_number:05d}.png"):
                 frame_path = os.path.join(folder, f"frame_{frame_number:05d}.png")
-            pil_image.save(frame_path)
-            # create the video
-            self.create_video_from_frames(self, folder, "heatmap_video.mp4", 30, pil_image)
-        
-
-
-    def create_video_from_frames(self, folder: str, video_filename: str, fps: int, frame_to_add: Image):
-    # Get the list of frame files
-        frame_files = sorted([f for f in os.listdir(folder) if f.startswith("frame_") and f.endswith(".png")])
-        if not frame_files:
-            return
+            #pil_image.save(frame_path)
+           
+    def create_video_from_frames(self, video_filename: str, fps: int, frame_to_add: np.array):
+        # # Get the list of frame files
+        frame_files = sorted([f for f in os.listdir(self.save_path) if f.startswith("frame_") and f.endswith(".png")])
+        #if not frame_files:
+        #    return
             # Read the first frame to get the dimensions
-        first_frame = cv2.imread(os.path.join(folder, frame_files[0]))
+        first_frame = cv2.imread(os.path.join(self.save_path, frame_files[0]))
         height, width, layers = first_frame.shape
-
-        # Initialize the video writer
-        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-        video = cv2.VideoWriter(video_filename, fourcc, fps, (width, height))
+        # create video
+        if video is None:
+            fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+            self.video = cv2.VideoWriter(video_filename, fourcc, fps, (width, height))
 
         # Write each frame to the video
-        #frame = cv2.imread(os.path.join(folder, frame_file))
-        video.write(frame_to_add)
+        self.video.write(frame_to_add)
 
-        # Release the video writer
-        video.release()
 
     def save_heatmap_data(self, heatmap_image: np.ndarray, data_filename: str, image_filename: str):
     # Save the heatmap data as a NumPy binary file
@@ -890,11 +889,14 @@ class PressureSensorApp(tk.Tk):
                 "Error opening serial port: \n\n" \
                 f"{str(e)}"
             )
-            self.close_serial()
+            self.close_serial()            
             return False
         
     def close_serial(self):
+        if video is not None:
+            self.video.release()
         self.serialcomm.close()
+        
 
     def save_app_state(self):
         with open(STATE_FILE_PATH, "w") as file:
