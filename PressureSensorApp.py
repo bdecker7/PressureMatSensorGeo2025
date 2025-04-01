@@ -725,8 +725,6 @@ class PressureSensorApp(tk.Tk):
         return data
 
     def draw_heatmap(self, canvas_resized: bool = False):
-        # TODO: rotating, mirroring, and if there is no data what to do
-
         # Heatmap image starts as a copy of the data
         heatmap_image: np.ndarray = self.data.copy()
 
@@ -739,6 +737,9 @@ class PressureSensorApp(tk.Tk):
             heatmap_image = np.rot90(heatmap_image, 3)
         if self.app_state.mirror_heatmap_image:
             heatmap_image = np.fliplr(heatmap_image)
+
+        MAX_VAL = np.max(heatmap_image)
+        MIN_VAL = np.min(heatmap_image)
 
         # Interpolate the data (smooth it out)
         # ndimage.zoom(heatmap_image, zoom=4, order=3, mode='nearest')
@@ -802,51 +803,34 @@ class PressureSensorApp(tk.Tk):
 
         self.array_for_recorded_data = heatmap_image
         
-        # Save the heatmap data to files
-        #this save the data as NumPy binary format (.npy) . This is important for doing the recorded data.
-        # self.save_heatmap_data(heatmap_image, "heatmap_data.npy", "heatmap_image.png")
-
-            # Save the heatmap frame
+        # Save the heatmap frame in video record
         if self.recording:
-            frame_number = getattr(self, 'frame_number', 0)
-            if frame_number == 0:
-                self.save_heatmap_frame(heatmap_image, frame_number, self.save_path)
-            frame_number = frame_number + 1
-            self.create_video_from_frames(self.save_path, 30, self.array_for_recorded_data)
-
-    def save_heatmap_frame(self, heatmap_image: np.ndarray, frame_number: int, folder: str):
-    # Convert the heatmap to an image
-        pil_image = Image.fromarray(heatmap_image.astype(np.uint8))
+            self.create_video_from_frames(self.save_path, 30, heatmap_image)
+       
+    def create_video_from_frames(self, folder: str, fps: int, frame_to_add: np.array):
+        global video
+        # create folder to store the video
         if not os.path.exists(folder):
             try:
                 os.makedirs(folder)
                 print(folder)
-
             except Exception as e:
                     print("error from folder")
-            #os.path.join(self.new_state.recorded_data_save_directory, self.save_path)
-        else:
-            if not os.path.exists(f"{folder}/frame_{frame_number:05d}.png"):
-                frame_path = os.path.join(folder, f"frame_{frame_number:05d}.png")
-            #pil_image.save(frame_path)
-           
-    def create_video_from_frames(self, folder: str, fps: int, frame_to_add: np.array):
-        global video
+
         video_path = folder + "/heatmap_video.mp4"
-        # # Get the list of frame files
-        #frame_files = sorted([f for f in os.listdir(self.save_path) if f.startswith("frame_") and f.endswith(".png")])
-        #if not frame_files:
-        #    return
-            # Read the first frame to get the dimensions
-        #first_frame = cv2.imread(os.path.join(self.save_path, frame_files[0]))
+        
         height, width, layers = frame_to_add.shape
+
         # create video
         if video is None:
             fourcc = cv2.VideoWriter_fourcc(*'mp4v')
             video = cv2.VideoWriter(video_path, fourcc, fps, (width, height), True)
 
+        # convert RGB to BGR for video record
+        frame = cv2.cvtColor(frame_to_add, cv2.COLOR_RGB2BGR)
+        
         # Write each frame to the video
-        video.write(frame_to_add)
+        video.write(frame)
 
 
     def save_heatmap_data(self, heatmap_image: np.ndarray, data_filename: str, image_filename: str):
