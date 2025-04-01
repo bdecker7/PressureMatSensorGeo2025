@@ -812,7 +812,7 @@ class PressureSensorApp(tk.Tk):
             if frame_number == 0:
                 self.save_heatmap_frame(heatmap_image, frame_number, self.save_path)
             frame_number = frame_number + 1
-            self.create_video_from_frames("heatmap_video.mp4", 30, self.array_for_recorded_data)
+            self.create_video_from_frames(self.save_path, 30, self.array_for_recorded_data)
 
     def save_heatmap_frame(self, heatmap_image: np.ndarray, frame_number: int, folder: str):
     # Convert the heatmap to an image
@@ -830,8 +830,9 @@ class PressureSensorApp(tk.Tk):
                 frame_path = os.path.join(folder, f"frame_{frame_number:05d}.png")
             #pil_image.save(frame_path)
            
-    def create_video_from_frames(self, video_filename: str, fps: int, frame_to_add: np.array):
+    def create_video_from_frames(self, folder: str, fps: int, frame_to_add: np.array):
         global video
+        video_path = folder + "/heatmap_video.mp4"
         # # Get the list of frame files
         #frame_files = sorted([f for f in os.listdir(self.save_path) if f.startswith("frame_") and f.endswith(".png")])
         #if not frame_files:
@@ -842,7 +843,7 @@ class PressureSensorApp(tk.Tk):
         # create video
         if video is None:
             fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-            video = cv2.VideoWriter(video_filename, fourcc, fps, (width, height), True)
+            video = cv2.VideoWriter(video_path, fourcc, fps, (width, height), True)
 
         # Write each frame to the video
         video.write(frame_to_add)
