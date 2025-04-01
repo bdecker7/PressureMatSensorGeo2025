@@ -96,8 +96,10 @@ class PressureSensorApp(tk.Tk):
         self.thread_data_update.start()
 
     def on_close(self):
+        global video
         if video is not None:
-            self.video.release()
+            video.release()
+            video = None
         self.destroy()
         sys.exit(0)
 
@@ -454,6 +456,7 @@ class PressureSensorApp(tk.Tk):
         pass
 
     def on_btn_record(self):
+        global video
         if not self.recording:
             if not self.app_state.recorded_data_save_directory or not self.app_state.recorded_data_filename:
                 return
@@ -479,6 +482,10 @@ class PressureSensorApp(tk.Tk):
         
         else:
             self.recording = False
+            # close video
+            if video is not None:
+                video.release()
+                video = None
             self.refresh_gui()
 
     def on_btn_select_recording_directory(self):
@@ -571,9 +578,6 @@ class PressureSensorApp(tk.Tk):
     def refresh_frm_playpause_etc(self):
         if self.paused:
             self.strvar_playpause_btn.set("▶")
-            # close video
-            if video is not None:
-                self.video.release()
         else:
             self.strvar_playpause_btn.set("◼")
 
@@ -827,20 +831,21 @@ class PressureSensorApp(tk.Tk):
             #pil_image.save(frame_path)
            
     def create_video_from_frames(self, video_filename: str, fps: int, frame_to_add: np.array):
+        global video
         # # Get the list of frame files
-        frame_files = sorted([f for f in os.listdir(self.save_path) if f.startswith("frame_") and f.endswith(".png")])
+        #frame_files = sorted([f for f in os.listdir(self.save_path) if f.startswith("frame_") and f.endswith(".png")])
         #if not frame_files:
         #    return
             # Read the first frame to get the dimensions
-        first_frame = cv2.imread(os.path.join(self.save_path, frame_files[0]))
-        height, width, layers = first_frame.shape
+        #first_frame = cv2.imread(os.path.join(self.save_path, frame_files[0]))
+        height, width, layers = frame_to_add.shape
         # create video
         if video is None:
             fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-            self.video = cv2.VideoWriter(video_filename, fourcc, fps, (width, height))
+            video = cv2.VideoWriter(video_filename, fourcc, fps, (width, height), True)
 
         # Write each frame to the video
-        self.video.write(frame_to_add)
+        video.write(frame_to_add)
 
 
     def save_heatmap_data(self, heatmap_image: np.ndarray, data_filename: str, image_filename: str):
@@ -893,8 +898,10 @@ class PressureSensorApp(tk.Tk):
             return False
         
     def close_serial(self):
+        global video
         if video is not None:
-            self.video.release()
+            video.release()
+            video = None
         self.serialcomm.close()
         
 
