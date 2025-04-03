@@ -42,6 +42,8 @@ ICON_PATH = os.path.join(getattr(sys, "_MEIPASS", os.path.dirname(__file__)), IC
 
 #for recorded video
 video = None
+file_name = None
+file_path = None
 
 
 # The state of the GUI, in terms of user selections and settings
@@ -57,7 +59,6 @@ class PressureSensorAppState:
     frames_per_second: int | Literal["Max"] = "Max"
     recorded_data_save_directory: str | None = None
     recorded_data_filename: str = "data"
-    recorded_data_append_datetime: bool = True
     # Settings (from the "settings" window at the bottom)
     mirror_heatmap_image: bool = False
     rotate_heatmap_image: Literal[0, 90, 180, 270] = 0 # clockwise
@@ -355,18 +356,14 @@ class PressureSensorApp(tk.Tk):
         # Name of file to save the recorded data
         frm_recording_filename = ttk.Frame(parent)
         frm_recording_filename.grid(row=2, column=1, sticky="ew")
-        self.strval_recording_filename = tk.StringVar(frm_recording_filename, value="data")
+        self.strval_recording_filename = tk.StringVar(frm_recording_filename, value="NAME")
         self.entry_recording_filename = ttk.Entry(frm_recording_filename, textvariable=self.strval_recording_filename, width=8)
         self.entry_recording_filename.grid(row=0, column=1, sticky="ew")
         self.entry_recording_filename.bind("<FocusOut>", lambda e: self.on_btn_new_recording_filename())
         frm_recording_filename.columnconfigure(1, weight=1)
-        lbl_csv = ttk.Label(frm_recording_filename, text=".csv")
-        lbl_csv.grid(row=0, column=2, sticky="w")
-        self.boolvar_append_datetime = tk.BooleanVar(frm_recording_filename, value=True)
-        self.chkbtn_append_datetime = ttk.Checkbutton(frm_recording_filename, text="Append Date/Time", style="TCheckbutton", variable=self.boolvar_append_datetime)
-        self.chkbtn_append_datetime.grid(row=0, column=3, sticky="w", padx=(self.padding, 0))
-        self.chkbtn_append_datetime.bind("<Button-1>", lambda e: self.on_btn_chkbtn_append_datetime())
-
+        lbl_vid = ttk.Label(frm_recording_filename, text=".mp4")
+        lbl_vid.grid(row=0, column=2, sticky="w")
+       
         # Frame counter and time elapsed
         frm_frm_counter = ttk.Frame(parent)
         frm_frm_counter.grid(row=3, column=0, columnspan=2, sticky="ew")
@@ -457,29 +454,27 @@ class PressureSensorApp(tk.Tk):
 
     def on_btn_record(self):
         global video
+        global file_name
+        global file_path
         if not self.recording:
             if not self.app_state.recorded_data_save_directory or not self.app_state.recorded_data_filename:
                 return
 
             save_name: str = self.app_state.recorded_data_filename
-            if self.app_state.recorded_data_append_datetime:
-                save_name += "_" + time.strftime("%Y-%m-%d_%H-%M-%S")
-                os.path.join(self.app_state.recorded_data_save_directory, save_name)
-                self.save_path= os.path.join(self.app_state.recorded_data_save_directory, save_name)
-            
+            save_path= os.path.join(self.app_state.recorded_data_save_directory, save_name)            
             # Ask user if they want to overwrite the existing file
-            if os.path.exists(self.save_path):
+            if os.path.exists(save_path):
                 prompt = f"File '{save_name}' already exists. Recording will overwrite the file. Continue?"
                 if messagebox.askyesno("Overwrite File", prompt):
                     self.recording = True
                     self.time_recording_started = time.time()
                     self.refresh_gui()
-            
             else:
                 self.recording = True
                 self.time_recording_started = time.time()
                 self.refresh_gui()
-        
+            file_name = save_name
+            file_path = save_path
         else:
             self.recording = False
             # close video
@@ -487,6 +482,7 @@ class PressureSensorApp(tk.Tk):
                 video.release()
                 video = None
             self.refresh_gui()
+        
 
     def on_btn_select_recording_directory(self):
         # Select a new directory to save the recorded data
@@ -495,10 +491,6 @@ class PressureSensorApp(tk.Tk):
     
     def on_btn_new_recording_filename(self):
         self.new_state.recorded_data_filename = self.strval_recording_filename.get()
-        self.refresh_gui()
-
-    def on_btn_chkbtn_append_datetime(self):
-        self.new_state.recorded_data_append_datetime = self.boolvar_append_datetime.get()
         self.refresh_gui()
 
     def on_btn_decrease_font_size(self):
@@ -587,12 +579,10 @@ class PressureSensorApp(tk.Tk):
             self.strvar_record.set("◼")
             self.btn_recording_directory.configure(state="disabled")
             self.entry_recording_filename.configure(state="disabled")
-            self.chkbtn_append_datetime.configure(state="disabled")
         else:
             self.strvar_record.set("⬤")
             self.btn_recording_directory.configure(state="normal")
             self.entry_recording_filename.configure(state="normal")
-            self.chkbtn_append_datetime.configure(state="normal")
         
         # Disable/Enable the record button based on whether a directory has been selected
         if not self.new_state.recorded_data_save_directory:
@@ -725,6 +715,8 @@ class PressureSensorApp(tk.Tk):
         return data
 
     def draw_heatmap(self, canvas_resized: bool = False):
+        #global MAX_VAL
+        #global MIN_VAL
         # Heatmap image starts as a copy of the data
         heatmap_image: np.ndarray = self.data.copy()
 
@@ -738,8 +730,8 @@ class PressureSensorApp(tk.Tk):
         if self.app_state.mirror_heatmap_image:
             heatmap_image = np.fliplr(heatmap_image)
 
-        MAX_VAL = np.max(heatmap_image)
-        MIN_VAL = np.min(heatmap_image)
+        MAX_VAL = np.max(self.data)
+        MIN_VAL = np.min(self.data)
 
         # Interpolate the data (smooth it out)
         # ndimage.zoom(heatmap_image, zoom=4, order=3, mode='nearest')
@@ -747,7 +739,7 @@ class PressureSensorApp(tk.Tk):
 
         # Build and apply a colormap to the data (making the data an RGB image)
         normalized_data = (heatmap_image - MIN_VAL) / (MAX_VAL - MIN_VAL)
-        heatmap_image = apply_colormap(normalized_data, "inferno")
+        heatmap_image = apply_colormap(normalized_data, "inferno") # causing possible error
         heatmap_image *= 255 # Convert to 0-255 range (for RGB) rather than 0-1
 
         # Calculate the size of each heatmap cell based on the size of the canvas
@@ -805,7 +797,7 @@ class PressureSensorApp(tk.Tk):
         
         # Save the heatmap frame in video record
         if self.recording:
-            self.create_video_from_frames(self.save_path, 30, heatmap_image)
+            self.create_video_from_frames(file_path, 30, heatmap_image)
        
     def create_video_from_frames(self, folder: str, fps: int, frame_to_add: np.array):
         global video
@@ -816,8 +808,8 @@ class PressureSensorApp(tk.Tk):
                 print(folder)
             except Exception as e:
                     print("error from folder")
-
-        video_path = folder + "/heatmap_video.mp4"
+        #names the video
+        video_path = folder + ".mp4"
         
         height, width, layers = frame_to_add.shape
 
@@ -828,8 +820,8 @@ class PressureSensorApp(tk.Tk):
 
         # convert RGB to BGR for video record
         frame = cv2.cvtColor(frame_to_add, cv2.COLOR_RGB2BGR)
-        
-        # Write each frame to the video
+
+        # Write frame to the video
         video.write(frame)
 
 
