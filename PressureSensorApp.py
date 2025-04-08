@@ -1,7 +1,7 @@
 
 from appdirs import user_data_dir
 import numpy as np
-# from scipy import ndimage
+from scipy import ndimage
 from colormaps import apply_colormap
 from PIL import Image, ImageTk
 import serial.tools.list_ports as list_ports
@@ -715,8 +715,6 @@ class PressureSensorApp(tk.Tk):
         return data
 
     def draw_heatmap(self, canvas_resized: bool = False):
-        #global MAX_VAL
-        #global MIN_VAL
         # Heatmap image starts as a copy of the data
         heatmap_image: np.ndarray = self.data.copy()
 
@@ -730,15 +728,20 @@ class PressureSensorApp(tk.Tk):
         if self.app_state.mirror_heatmap_image:
             heatmap_image = np.fliplr(heatmap_image)
 
-        MAX_VAL = np.max(self.data)
-        MIN_VAL = np.min(self.data)
 
+
+        MAX_VAL = np.max(heatmap_image)
+        p25 = np.percentile(heatmap_image, 25) # calculate the 25th percentile
+        
+        MIN_VAL = np.min(heatmap_image)
+        if(MAX_VAL <= 0):
+            MAX_VAL = 1023
         # Interpolate the data (smooth it out)
-        # ndimage.zoom(heatmap_image, zoom=4, order=3, mode='nearest')
+        ndimage.zoom(heatmap_image, zoom=4, order=3, mode='nearest')
         heatmap_image = np.clip(heatmap_image, MIN_VAL, MAX_VAL)
 
         # Build and apply a colormap to the data (making the data an RGB image)
-        normalized_data = (heatmap_image - MIN_VAL) / (MAX_VAL - MIN_VAL)
+        normalized_data = (heatmap_image - p25) / (MAX_VAL - p25)
         heatmap_image = apply_colormap(normalized_data, "inferno") # causing possible error
         heatmap_image *= 255 # Convert to 0-255 range (for RGB) rather than 0-1
 
