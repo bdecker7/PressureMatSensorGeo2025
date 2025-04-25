@@ -1,4 +1,7 @@
-
+# TODO: implement the stats. Not a high priority 
+# because client really only wants the colors, 
+# but it is a nice addition
+# right now it is all commented out
 from appdirs import user_data_dir
 import numpy as np
 from scipy import ndimage
@@ -46,6 +49,7 @@ file_name = None
 file_path = None
 
 
+
 # The state of the GUI, in terms of user selections and settings
 # This dataclass is regularly saved to a JSON file and loaded 
 # when the GUI is started so that the user's previous settings are preserved
@@ -54,17 +58,17 @@ class PressureSensorAppState:
     # Automatically determined by the App
     heatmap_canvas_size: tuple[int, int] = (400, 400) # (width, height) in pixels
     # User selections
-    data_source: Literal["com_port", "recorded", "simulated"] | None = None
+    data_source: Literal["com_port", "Simulación"] | None = None
     com_port: str | None = None
     frames_per_second: int | Literal["Max"] = "Max"
     recorded_data_save_directory: str | None = None
-    recorded_data_filename: str = "data"
+    recorded_data_filename: str = "Nombre del Archivo"
     # Settings (from the "settings" window at the bottom)
     mirror_heatmap_image: bool = False
     rotate_heatmap_image: Literal[0, 90, 180, 270] = 0 # clockwise
     interp_level: int = 1
-    data_units: Literal["raw", "lbs", "mmHg"] = "raw"
-    display_vals_on_heatmap: bool = False
+    # data_units: Literal["raw", "lbs", "mmHg"] = "raw"
+    # display_vals_on_heatmap: bool = False
     font_size: int = 11
 
 DEFAULT_STATE = PressureSensorAppState()
@@ -220,11 +224,11 @@ class PressureSensorApp(tk.Tk):
         frm_record_data.grid(row=4, column=0, sticky="ew")
         self.build_frm_record_data(parent=frm_record_data)
 
-        ttk.Separator(parent, orient="horizontal").grid(row=5, column=0, sticky="ew", pady=self.padding)
+        # ttk.Separator(parent, orient="horizontal").grid(row=5, column=0, sticky="ew", pady=self.padding)
 
-        frm_stats = ttk.Frame(parent)
-        frm_stats.grid(row=6, column=0, sticky="ew")
-        self.build_frm_stats(parent=frm_stats)
+        # frm_stats = ttk.Frame(parent)
+        # frm_stats.grid(row=6, column=0, sticky="ew")
+        # self.build_frm_stats(parent=frm_stats)
 
         parent.rowconfigure(7, weight=1) # Empty row that is allowed to expand (empty space)
         ttk.Separator(parent, orient="horizontal").grid(row=8, column=0, sticky="ew", pady=self.padding)
@@ -234,14 +238,14 @@ class PressureSensorApp(tk.Tk):
         self.build_frm_settings(parent=frm_settings)
 
     def build_frm_data_source(self, parent: ttk.Frame):
-        lbl_data_source = ttk.Label(parent, text="Data Source", style="Header.TLabel")
+        lbl_data_source = ttk.Label(parent, text="Fuente de Datos", style="Header.TLabel")
         lbl_data_source.grid(row=0, column=0, sticky="w")
         parent.columnconfigure(0, weight=1)
 
         self.strvar_radiobtns_data_source = tk.StringVar(parent, value=self.app_state.data_source)
 
         radiobtn_com_port = ttk.Radiobutton(parent, 
-                                            text="COM Port", 
+                                            text="USB", 
                                             variable=self.strvar_radiobtns_data_source, 
                                             value="com_port", 
                                             command=self.on_radiobtn_data_source)
@@ -256,17 +260,11 @@ class PressureSensorApp(tk.Tk):
         btn_refresh_com_ports = ttk.Button(parent, text="⟳", style="IconButton.TButton", command=self.on_btn_refresh_com_ports_list)
         btn_refresh_com_ports.grid(row=1, column=2, sticky="w", padx=(self.padding, 0))
 
-        radiobtn_recorded_data = ttk.Radiobutton(parent, 
-                                                 text="Recorded Data", 
-                                                 variable=self.strvar_radiobtns_data_source, 
-                                                 value="recorded", 
-                                                 command=self.on_radiobtn_data_source)
-        radiobtn_recorded_data.grid(row=2, column=0, sticky="w")
 
         radiobtn_simulated_data = ttk.Radiobutton(parent, 
-                                                  text="Simulated Data", 
+                                                  text="Simulación", 
                                                   variable=self.strvar_radiobtns_data_source, 
-                                                  value="simulated",
+                                                  value="Simulación",
                                                   command=self.on_radiobtn_data_source)
         radiobtn_simulated_data.grid(row=3, column=0, sticky="w")
 
@@ -276,13 +274,13 @@ class PressureSensorApp(tk.Tk):
         btn_playpause.grid(row=0, column=0, rowspan=2, sticky="nsew", padx=(0, self.padding))
         parent.rowconfigure(0, weight=1)
 
-        lbl_framespersecond = ttk.Label(parent, text="Frames/Second:")
+        lbl_framespersecond = ttk.Label(parent, text="FPS:")
         lbl_framespersecond.grid(row=0, column=1, sticky="e")
         parent.columnconfigure(1, weight=1)
 
-        self.strvar_framespersecond = tk.StringVar(parent, value="Max")
+        self.strvar_framespersecond = tk.StringVar(parent, value="Máximo")
         cmbbox_framespersecond = ttk.Combobox(parent, textvariable=self.strvar_framespersecond, width=4)
-        cmbbox_framespersecond["values"] = ["Max", "20", "10", "5", "2", "1"]
+        cmbbox_framespersecond["values"] = ["Máx", "20", "10", "5", "2", "1"]
         cmbbox_framespersecond.grid(row=0, column=2, sticky="w")
 
         frm_prev_next_frame = ttk.Frame(parent)
@@ -290,52 +288,52 @@ class PressureSensorApp(tk.Tk):
         frm_prev_next_frame.columnconfigure(0, weight=1)
         frm_prev_next_frame.columnconfigure(1, weight=1)
 
-        btn_prev_frame = ttk.Button(frm_prev_next_frame, text="< Prev", width=len("< Prev"), style="TButton", command=self.on_btn_prev_frame)
+        btn_prev_frame = ttk.Button(frm_prev_next_frame, text="< Vuelva", width=len("< Vuelva"), style="TButton", command=self.on_btn_prev_frame)
         btn_prev_frame.grid(row=0, column=0, sticky="nsew")
 
-        btn_next_frame = ttk.Button(frm_prev_next_frame, text="Next >", width=len("Next >"), style="TButton", command=self.on_btn_next_frame)
+        btn_next_frame = ttk.Button(frm_prev_next_frame, text="Sigue >", width=len("Sigue >"), style="TButton", command=self.on_btn_next_frame)
         btn_next_frame.grid(row=0, column=1, sticky="nsew")
 
-        lbl_frame_number = ttk.Label(parent, text="Frame:")
+        lbl_frame_number = ttk.Label(parent, text="Fotograma:")
         lbl_frame_number.grid(row=2, column=0, sticky="w")
 
         self.strvar_frame_number = tk.StringVar(parent, value="0")
         lbl_frame_number_value = ttk.Label(parent, textvariable=self.strvar_frame_number)
         lbl_frame_number_value.grid(row=2, column=1, sticky="w")
 
-    def build_frm_stats(self, parent: ttk.Frame):
-        lbl_frm_stats = ttk.Label(parent, text="Statistics", style="Header.TLabel")
-        lbl_frm_stats.grid(row=0, column=0, columnspan=4, sticky="w")
-        parent.columnconfigure(0, weight=0)
+    # def build_frm_stats(self, parent: ttk.Frame):
+    #     lbl_frm_stats = ttk.Label(parent, text="Estadística", style="Header.TLabel")
+    #     lbl_frm_stats.grid(row=0, column=0, columnspan=4, sticky="w")
+    #     parent.columnconfigure(0, weight=0)
         
-        lbl_max = ttk.Label(parent, text="Max:")
-        lbl_max.grid(row=1, column=0, sticky="w")
-        self.strvar_stats_max = tk.StringVar(parent, value="0.0")
-        lbl_max_value = ttk.Label(parent, textvariable=self.strvar_stats_max)
-        lbl_max_value.grid(row=1, column=1, sticky="w")
+    #     lbl_max = ttk.Label(parent, text="Máximo:")
+    #     lbl_max.grid(row=1, column=0, sticky="w")
+    #     self.strvar_stats_max = tk.StringVar(parent, value="0.0")
+    #     lbl_max_value = ttk.Label(parent, textvariable=self.strvar_stats_max)
+    #     lbl_max_value.grid(row=1, column=1, sticky="w")
 
-        lbl_min = ttk.Label(parent, text="Min:")
-        lbl_min.grid(row=2, column=0, sticky="w")
-        self.strvar_stats_min = tk.StringVar(parent, value="0.0")
-        lbl_min_value = ttk.Label(parent, textvariable=self.strvar_stats_min)
-        lbl_min_value.grid(row=2, column=1, sticky="w")
+    #     lbl_min = ttk.Label(parent, text="Mínimo:")
+    #     lbl_min.grid(row=2, column=0, sticky="w")
+    #     self.strvar_stats_min = tk.StringVar(parent, value="0.0")
+    #     lbl_min_value = ttk.Label(parent, textvariable=self.strvar_stats_min)
+    #     lbl_min_value.grid(row=2, column=1, sticky="w")
 
-        lbl_avg = ttk.Label(parent, text="Avg:")
-        lbl_avg.grid(row=3, column=0, sticky="w")
-        self.strvar_stats_avg = tk.StringVar(parent, value="0.0")
-        lbl_avg_value = ttk.Label(parent, textvariable=self.strvar_stats_avg)
-        lbl_avg_value.grid(row=3, column=1, sticky="w")
+    #     lbl_avg = ttk.Label(parent, text="Promedio:")
+    #     lbl_avg.grid(row=3, column=0, sticky="w")
+    #     self.strvar_stats_avg = tk.StringVar(parent, value="0.0")
+    #     lbl_avg_value = ttk.Label(parent, textvariable=self.strvar_stats_avg)
+    #     lbl_avg_value.grid(row=3, column=1, sticky="w")
 
-        lbl_std_dev = ttk.Label(parent, text="Std Dev:")
-        lbl_std_dev.grid(row=4, column=0, sticky="w")
-        self.strvar_stats_std_dev = tk.StringVar(parent, value="0.0")
-        lbl_std_dev_value = ttk.Label(parent, textvariable=self.strvar_stats_std_dev)
-        lbl_std_dev_value.grid(row=4, column=1, sticky="w")
+    #     lbl_std_dev = ttk.Label(parent, text="Desviación Estándar:")
+    #     lbl_std_dev.grid(row=4, column=0, sticky="w")
+    #     self.strvar_stats_std_dev = tk.StringVar(parent, value="0.0")
+    #     lbl_std_dev_value = ttk.Label(parent, textvariable=self.strvar_stats_std_dev)
+    #     lbl_std_dev_value.grid(row=4, column=1, sticky="w")
 
-        parent.columnconfigure(1, weight=1)
+    #     parent.columnconfigure(1, weight=1)
 
     def build_frm_record_data(self, parent: ttk.Frame):
-        lbl_recorded_data = ttk.Label(parent, text="Record Data", style="Header.TLabel")
+        lbl_recorded_data = ttk.Label(parent, text="Grabe", style="Header.TLabel")
         lbl_recorded_data.grid(row=0, column=0, columnspan=2, sticky="w")
 
         self.strvar_record = tk.StringVar(parent, value="⬤")
@@ -348,7 +346,7 @@ class PressureSensorApp(tk.Tk):
         parent.columnconfigure(1, weight=1)
         self.btn_recording_directory = ttk.Button(frm_recording_directory, text=u"\U0001F4C1", style="TButton", width=4, command=self.on_btn_select_recording_directory)
         self.btn_recording_directory.grid(row=0, column=0, sticky="w")
-        self.strval_recording_directory = tk.StringVar(frm_recording_directory, value="← Select Directory")
+        self.strval_recording_directory = tk.StringVar(frm_recording_directory, value="← Seleccionar directorio")
         self.lbl_recording_directory = ttk.Label(frm_recording_directory, textvariable=self.strval_recording_directory, style="SmallText.TLabel")
         self.lbl_recording_directory.grid(row=0, column=1, sticky="ew")
         frm_recording_directory.columnconfigure(1, weight=1)
@@ -356,7 +354,7 @@ class PressureSensorApp(tk.Tk):
         # Name of file to save the recorded data
         frm_recording_filename = ttk.Frame(parent)
         frm_recording_filename.grid(row=2, column=1, sticky="ew")
-        self.strval_recording_filename = tk.StringVar(frm_recording_filename, value="NAME")
+        self.strval_recording_filename = tk.StringVar(frm_recording_filename, value=self.app_state.recorded_data_filename)
         self.entry_recording_filename = ttk.Entry(frm_recording_filename, textvariable=self.strval_recording_filename, width=8)
         self.entry_recording_filename.grid(row=0, column=1, sticky="ew")
         self.entry_recording_filename.bind("<FocusOut>", lambda e: self.on_btn_new_recording_filename())
@@ -367,14 +365,14 @@ class PressureSensorApp(tk.Tk):
         # Frame counter and time elapsed
         frm_frm_counter = ttk.Frame(parent)
         frm_frm_counter.grid(row=3, column=0, columnspan=2, sticky="ew")
-        lbl_frame_counter = ttk.Label(frm_frm_counter, text="Frames Recorded:")
+        lbl_frame_counter = ttk.Label(frm_frm_counter, text="Fotogramas grabados:")
         lbl_frame_counter.grid(row=0, column=0, sticky="w")
         self.strvar_frame_counter = tk.StringVar(frm_frm_counter, value="0")
         lbl_frame_counter_value = ttk.Label(frm_frm_counter, textvariable=self.strvar_frame_counter)
         lbl_frame_counter_value.grid(row=0, column=1, sticky="w", padx=(self.padding, 0))
 
     def build_frm_settings(self, parent: ttk.Frame):
-        lbl_settings = ttk.Label(parent, text="Settings", style="Header.TLabel")
+        lbl_settings = ttk.Label(parent, text="Ajustes", style="Header.TLabel")
         lbl_settings.grid(row=0, column=0, sticky="w")
         parent.columnconfigure(0, weight=1)
 
@@ -382,18 +380,18 @@ class PressureSensorApp(tk.Tk):
         frm_settings_image_rotation_mirror = ttk.Frame(parent)
         frm_settings_image_rotation_mirror.grid(row=1, column=0, sticky="nsew")
 
-        lbl_image_orientaion = ttk.Label(frm_settings_image_rotation_mirror, text="Image Orientation")
+        lbl_image_orientaion = ttk.Label(frm_settings_image_rotation_mirror, text="Orientación de la Imagen")
         lbl_image_orientaion.grid(row=0, column=0, sticky="ew")
         frm_settings_image_rotation_mirror.columnconfigure(0, weight=1)
 
         self.bvar_chkbtn_mirror_image = tk.BooleanVar(frm_settings_image_rotation_mirror, value=self.app_state.mirror_heatmap_image)
         chkbtn_mirror_image = ttk.Checkbutton(
-            frm_settings_image_rotation_mirror, variable=self.bvar_chkbtn_mirror_image, text="Mirror", command=self.on_chkbtn_mirror_heatmap_image
+            frm_settings_image_rotation_mirror, variable=self.bvar_chkbtn_mirror_image, text="Espejo", command=self.on_chkbtn_mirror_heatmap_image
         )
         chkbtn_mirror_image.grid(row=0, column=1, sticky="ew")
 
         icon: str = "\u27F3" if self.app_state.mirror_heatmap_image else "\u27F2"
-        self.strvar_btn_rotate_image = tk.StringVar(frm_settings_image_rotation_mirror, value=f"Rotate {icon}")
+        self.strvar_btn_rotate_image = tk.StringVar(frm_settings_image_rotation_mirror, value=f"Gire {icon}")
         btn_rotate_image = ttk.Button(frm_settings_image_rotation_mirror, textvariable=self.strvar_btn_rotate_image, width=8, command=self.on_btn_rotate_heatmap_image)
         btn_rotate_image.grid(row=0, column=2, sticky="ew")
 
@@ -402,7 +400,7 @@ class PressureSensorApp(tk.Tk):
         frm_settings_font_size = ttk.Frame(parent)
         frm_settings_font_size.grid(row=2, column=0, sticky="nsew")
 
-        lbl_font_size = ttk.Label(frm_settings_font_size, text="Font Size")
+        lbl_font_size = ttk.Label(frm_settings_font_size, text="Tamaño de Fuente")
         lbl_font_size.grid(row=1, column=0, sticky="w")
         frm_settings_font_size.columnconfigure(0, weight=1)
 
@@ -427,10 +425,8 @@ class PressureSensorApp(tk.Tk):
         
         if new_source == "com_port":
             self.new_state.data_source = "com_port"
-        elif new_source == "recorded":
-            self.new_state.data_source = "recorded"
-        elif new_source == "simulated":
-            self.new_state.data_source = "simulated"
+        elif new_source == "Simulación":
+            self.new_state.data_source = "Simulación"
         
         self.refresh_gui()
 
@@ -463,9 +459,9 @@ class PressureSensorApp(tk.Tk):
             save_name: str = self.app_state.recorded_data_filename
             save_path= os.path.join(self.app_state.recorded_data_save_directory, save_name)            
             # Ask user if they want to overwrite the existing file
-            if os.path.exists(save_path):
-                prompt = f"File '{save_name}' already exists. Recording will overwrite the file. Continue?"
-                if messagebox.askyesno("Overwrite File", prompt):
+            if os.path.exists(save_path+".mp4"):
+                prompt = f"El archivo '{save_name}' ya existe. La grabación lo sobrescribirá. ¿Continuar?"
+                if messagebox.askyesno("Advertencia", prompt):
                     self.recording = True
                     self.time_recording_started = time.time()
                     self.refresh_gui()
@@ -605,7 +601,7 @@ class PressureSensorApp(tk.Tk):
         
         # Update the filename entry box if it is empty
         if not self.new_state.recorded_data_filename:
-            self.new_state.recorded_data_filename = "data"
+            self.new_state.recorded_data_filename = "Nombre del Archivo"
             self.strval_recording_filename.set(self.new_state.recorded_data_filename)
 
     def refresh_frm_stats(self):
@@ -635,9 +631,7 @@ class PressureSensorApp(tk.Tk):
             # Get new data
             if self.app_state.data_source == "com_port":
                 self.data = self.get_data_from_com_port()
-            elif self.app_state.data_source == "recorded":
-                self.data = self.get_data_from_recorded_data()
-            elif self.app_state.data_source == "simulated":
+            elif self.app_state.data_source == "Simulación":
                 self.data = self.get_data_simulated()
                 
             # Update the heatmap
@@ -708,10 +702,11 @@ class PressureSensorApp(tk.Tk):
         # Generate heatmap data based on sine waves and the current time
         for i in range(16):
             for j in range(16):
-                data[i][j] = MIN_VAL + MAX_VAL * np.clip(
-                    np.sin(2*np.pi*(j+1/2)/rows) * np.sin(np.pi*(i+1/2)/cols) * np.sin(time.time()), 0, 1
-                )
-                
+                data[i][j] = np.clip(
+                    np.sin(2*np.pi*(j+1/2)/rows) * 
+                    np.sin(np.pi*(i+1/2)/cols) * 
+                    np.sin(time.time()), 0, 1
+                    )         
         return data
 
     def draw_heatmap(self, canvas_resized: bool = False):
@@ -805,12 +800,12 @@ class PressureSensorApp(tk.Tk):
     def create_video_from_frames(self, folder: str, fps: int, frame_to_add: np.array):
         global video
         # create folder to store the video
-        if not os.path.exists(folder):
-            try:
-                os.makedirs(folder)
-                print(folder)
-            except Exception as e:
-                    print("error from folder")
+        # if not os.path.exists(folder):
+        #     try:
+        #         #os.makedirs(folder)
+        #         print(folder)
+        #     except Exception as e:
+        #             print("error from folder")
         #names the video
         video_path = folder + ".mp4"
         
